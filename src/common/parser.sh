@@ -114,33 +114,14 @@ process_env_value() {
 # Returns: Value with escape sequences processed
 process_double_quoted_value() {
     local value="$1"
-    local result=""
-    local i=0
-    local char next_char
-    
-    while [ $i -lt ${#value} ]; do
-        char="${value:$i:1}"
-        next_char="${value:$((i+1)):1}"
-        
-        if [ "$char" = "\\" ] && [ -n "$next_char" ]; then
-            # Handle escape sequences
-            case "$next_char" in
-                "n") result="${result}\n" ;;
-                "t") result="${result}\t" ;;
-                "r") result="${result}\r" ;;
-                "\\") result="${result}\\" ;;
-                "\"") result="${result}\"" ;;
-                "'") result="${result}'" ;;
-                *) result="${result}${char}${next_char}" ;;
-            esac
-            i=$((i + 2))
-        else
-            result="${result}${char}"
-            i=$((i + 1))
-        fi
-    done
-    
-    echo "$result"
+
+    # Handle escape sequences step by step
+    # First handle backslash-backslash-quote (\\") -> quote (")
+    value=$(echo "$value" | sed 's/\\\\\"/"/g')
+    # Then handle backslash-backslash (\\) -> backslash (\)
+    value=$(echo "$value" | sed 's/\\\\\\\\/\\\\/g')
+
+    echo "$value"
 }
 
 # Parse an entire .env file
@@ -184,7 +165,7 @@ get_variable_precedence() {
             suffix="${var_name##*_}"
             base_name="${var_name%_*}"
             # Shell-specific variables get highest priority
-            if [ "_$suffix" = "$(get_shell_suffix)" ]; then
+            if [ "$suffix" = "$shell_type" ]; then
                 score=100
             else
                 score=0  # Wrong shell suffix
@@ -194,13 +175,46 @@ get_variable_precedence() {
             suffix="${var_name##*_}"
             base_name="${var_name%_*}"
             # Platform-specific variables get medium priority
-            local platform_suffixes
-            platform_suffixes="$(get_platform_suffixes)"
-            if echo "$platform_suffixes" | grep -q "_$suffix"; then
-                score=50
-            else
-                score=0  # Wrong platform suffix
-            fi
+            case "$platform" in
+                WSL)
+                    if [ "$suffix" = "WSL" ] || [ "$suffix" = "LINUX" ] || [ "$suffix" = "UNIX" ]; then
+                        score=50
+                    else
+                        score=0
+                    fi
+                    ;;
+                LINUX)
+                    if [ "$suffix" = "LINUX" ] || [ "$suffix" = "UNIX" ]; then
+                        score=50
+                    else
+                        score=0
+                    fi
+                    ;;
+                MACOS)
+                    if [ "$suffix" = "MACOS" ] || [ "$suffix" = "UNIX" ]; then
+                        score=50
+                    else
+                        score=0
+                    fi
+                    ;;
+                WIN)
+                    if [ "$suffix" = "WIN" ]; then
+                        score=50
+                    else
+                        score=0
+                    fi
+                    ;;
+                UNIX)
+                    if [ "$suffix" = "UNIX" ]; then
+                        score=50
+                    else
+                        score=0
+                    fi
+                    ;;
+                *)
+                    score=0
+                    ;;
+            esac
             ;;
         *)
             # Generic variables get low priority

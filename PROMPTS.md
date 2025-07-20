@@ -4,7 +4,27 @@
 ```
 
 
+```md
+完成每一个shell的实现都必须按照.env编写所有测试用例（一个变量即为一个测试用例）并跑通，然后提交git，最后才能实现下一个shell的功能实现。
+注意：你需要检测一下SHELL后缀的优先级顺序时候正确：
+特定SHELL > 特定平台 > 平台 > 通用平台 > 无后缀。 如： 
+LINUX: var_NU > var_WSL > var_LINUX > var_UNIX > var
+MACOS: var_NU > var_MACOS > var_UNIX > var
+WIN: var_NU > var_WIN > var
+当检测到是LINUX平台， 那么就应该过滤掉_WIN和_MACOS等其他平台的变量才对啊， LINUX平台就应该只是加载和LINUX平台有关的变量_LINUX, _UNIX和没有后缀还有各种特定SHELL后缀
 
+例如： .env有变量如下：
+CONFIG_DIR=~/.config
+CONFIG_DIR_UNIX=~/.config/unix
+CONFIG_DIR_LINUX=~/.config/linux
+CONFIG_DIR_WSL=~/.config/wsl
+CONFIG_DIR_MACOS="~/Library/Application Support"
+CONFIG_DIR_WIN=%APPDATA%
+
+要是当前环境是Windows下的WSL环境， 那么CONFIG_DIR就应该取CONFIG_DIR_WSL，也就是CONFIG_DIR=~/.config/wsl， 其余变量应该过滤，也就是环境变量中不存在CONFIG_DIR_UNIX, CONFIG_DIR_LINUX, CONFIG_DIR_MACOS, CONFIG_DIR_WIN等变量。
+
+另外需要注意检测PATH_ADDITION_LINUX变量是否追加到原有环境的PATH变量之上，此外PATH是不能有任何变量的，都需要展开，如： $HOME, $JAVA_HOME等等，环境中的所有变量只要出现在PATH变量中都需要展开
+```
 
 
 
