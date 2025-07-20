@@ -18,8 +18,7 @@ NC='\033[0m' # No Color
 # Get script directory
 SCRIPT_DIR="${0:A:h}"
 
-# Source the zsh loader
-source "$SCRIPT_DIR/../../src/shells/zsh/loader.zsh"
+# Don't source the loader here - we'll do it in the test function
 
 # Test helper functions
 assert_env_var_set() {
@@ -236,67 +235,167 @@ test_application_configs() {
     assert_env_var_set "GITHUB_TOKEN" "ghp_1234567890abcdef" "GITHUB_TOKEN variable"
 }
 
-# Run all tests
+# Run all tests in a clean zsh subprocess
 run_all_tests() {
     print -P "${BLUE}Running Comprehensive Zsh Implementation Tests...${NC}"
     print "================================================="
-    
-    # Save original environment
-    ORIGINAL_HOME="$HOME"
-    ORIGINAL_PWD="$PWD"
-    ORIGINAL_PATH="$PATH"
-    ORIGINAL_ENV_LOADER_DEBUG="$ENV_LOADER_DEBUG"
-    
-    # Enable debug mode for testing
-    export ENV_LOADER_DEBUG=true
-    
-    # Clear the initialization flag to allow fresh loading
-    unset ENV_LOADER_INITIALIZED
 
-    # Clear any existing test variables that might interfere
-    unset TEST_SHELL HISTSIZE SAVEHIST HISTFILE CONFIG_DIR
+    # Run all tests in a clean zsh subprocess to avoid environment contamination
+    zsh -c "
+        # Prevent auto-initialization
+        export ENV_LOADER_INITIALIZED=true
 
-    # Load the .env file FIRST, before changing HOME
-    print "Loading .env file..."
-    # Load the specific .env file directly
-    load_env_file "$SCRIPT_DIR/../../.env" 2>/dev/null
-    
-    # Run test suites
-    test_basic_variables
-    print
-    test_shell_specific_variables
-    print
-    test_platform_specific_variables
-    print
-    test_path_handling
-    print
-    test_special_characters
-    print
-    test_unicode_characters
-    print
-    test_application_configs
-    print
-    
-    # Restore original environment
-    export HOME="$ORIGINAL_HOME"
-    cd "$ORIGINAL_PWD"
-    export PATH="$ORIGINAL_PATH"
-    export ENV_LOADER_DEBUG="$ORIGINAL_ENV_LOADER_DEBUG"
-    
-    # Print summary
-    print "Test Summary:"
-    print "============="
-    print -P "Total tests: $TEST_COUNT"
-    print -P "${GREEN}Passed: $PASS_COUNT${NC}"
-    print -P "${RED}Failed: $FAIL_COUNT${NC}"
-    
-    if [[ $FAIL_COUNT -eq 0 ]]; then
-        print -P "${GREEN}All tests passed!${NC}"
-        return 0
-    else
-        print -P "${RED}Some tests failed.${NC}"
-        return 1
-    fi
+        # Source the loader
+        source '$SCRIPT_DIR/../../src/shells/zsh/loader.zsh'
+
+        # Clear the flag to allow loading
+        unset ENV_LOADER_INITIALIZED
+
+        # Clear variables
+        unset TEST_SHELL HISTSIZE SAVEHIST HISTFILE CONFIG_DIR EDITOR VISUAL PAGER
+        unset TERM COLORTERM NODE_VERSION PYTHON_VERSION GO_VERSION GIT_DEFAULT_BRANCH
+        unset TEST_PLATFORM DOCUMENTS_DIR TEST_QUOTED GOOD_PATH MESSAGE_WITH_QUOTES
+        unset SQL_QUERY SPECIAL_CHARS_TEST WELCOME_MESSAGE EMOJI_STATUS CURRENCY_SYMBOLS
+        unset DOCUMENTS_INTL PROJECTS_INTL UNICODE_TEST DOCKER_HOST COMPOSE_PROJECT_NAME
+        unset DATABASE_URL REDIS_URL MONGODB_URL API_KEY JWT_SECRET GITHUB_TOKEN
+
+        # Save original PATH for testing
+        ORIGINAL_PATH=\"\$PATH\"
+
+        # Load .env file
+        load_env_file '$SCRIPT_DIR/../../.env' 2>/dev/null
+
+        # Test counters
+        TEST_COUNT=0
+        PASS_COUNT=0
+        FAIL_COUNT=0
+
+        # Test function
+        test_var() {
+            local var_name=\"\$1\"
+            local expected=\"\$2\"
+            local test_name=\"\$3\"
+
+            ((TEST_COUNT++))
+
+            # Get actual value
+            local actual=\"\${(P)var_name}\"
+
+            if [[ \"\$actual\" == \"\$expected\" ]]; then
+                print -P '${GREEN}✅ PASS${NC}: '\$test_name
+                ((PASS_COUNT++))
+            else
+                print -P '${RED}❌ FAIL${NC}: '\$test_name
+                print -P '   Variable: ${YELLOW}'\$var_name'${NC}'
+                print -P '   Expected: ${YELLOW}'\$expected'${NC}'
+                print -P '   Actual:   ${YELLOW}'\$actual'${NC}'
+                ((FAIL_COUNT++))
+            fi
+        }
+
+        # Run tests
+        print 'Testing basic variables...'
+        test_var 'EDITOR' 'vim' 'EDITOR variable'
+        test_var 'VISUAL' 'vim' 'VISUAL variable'
+        test_var 'PAGER' 'less' 'PAGER variable'
+        test_var 'TERM' 'xterm-256color' 'TERM variable'
+        test_var 'COLORTERM' 'truecolor' 'COLORTERM variable'
+        test_var 'NODE_VERSION' '18.17.0' 'NODE_VERSION variable'
+        test_var 'PYTHON_VERSION' '3.11.4' 'PYTHON_VERSION variable'
+        test_var 'GO_VERSION' '1.21.0' 'GO_VERSION variable'
+        test_var 'GIT_DEFAULT_BRANCH' 'main' 'GIT_DEFAULT_BRANCH variable'
+
+        print
+        print 'Testing shell-specific variables...'
+        test_var 'TEST_SHELL' 'zsh_detected' 'TEST_SHELL_ZSH precedence'
+        test_var 'HISTSIZE' '50000' 'HISTSIZE_ZSH precedence'
+        test_var 'SAVEHIST' '50000' 'SAVEHIST_ZSH precedence'
+        test_var 'HISTFILE' '~/.zsh_history' 'HISTFILE_ZSH precedence'
+
+        print
+        print 'Testing platform-specific variables...'
+        local platform
+        platform=\$(detect_platform)
+        case \"\$platform\" in
+            WSL)
+                test_var 'CONFIG_DIR' '~/.config/wsl' 'CONFIG_DIR_WSL precedence on WSL'
+                ;;
+            LINUX)
+                test_var 'CONFIG_DIR' '~/.config/linux' 'CONFIG_DIR_LINUX precedence on Linux'
+                test_var 'TEST_PLATFORM' 'unix_detected' 'TEST_PLATFORM_UNIX on Linux'
+                ;;
+            MACOS)
+                test_var 'CONFIG_DIR' '~/Library/Application Support' 'CONFIG_DIR_MACOS precedence on macOS'
+                ;;
+            WIN)
+                test_var 'CONFIG_DIR' '%APPDATA%' 'CONFIG_DIR_WIN precedence on Windows'
+                ;;
+            *)
+                test_var 'CONFIG_DIR' '~/.config' 'CONFIG_DIR generic fallback'
+                ;;
+        esac
+
+        print
+        print 'Testing PATH handling...'
+        case \"\$platform\" in
+            LINUX)
+                if [[ \"\$PATH\" == *'/tmp/test_linux_path'* ]]; then
+                    ((TEST_COUNT++))
+                    print -P '${GREEN}✅ PASS${NC}: PATH contains Linux-specific test path'
+                    ((PASS_COUNT++))
+                else
+                    ((TEST_COUNT++))
+                    print -P '${RED}❌ FAIL${NC}: PATH contains Linux-specific test path'
+                    ((FAIL_COUNT++))
+                fi
+                ;;
+        esac
+
+        print
+        print 'Testing special characters...'
+        test_var 'DOCUMENTS_DIR' '/home/user/Documents' 'DOCUMENTS_DIR with quotes'
+        test_var 'TEST_QUOTED' 'quoted value' 'TEST_QUOTED with quotes'
+        test_var 'GOOD_PATH' '/path/with spaces/file' 'GOOD_PATH with spaces'
+        test_var 'MESSAGE_WITH_QUOTES' 'Single quotes with \"double\" inside' 'MESSAGE_WITH_QUOTES mixed quotes'
+        test_var 'SQL_QUERY' 'SELECT * FROM users WHERE name = '\''John'\''' 'SQL_QUERY with quotes'
+        test_var 'SPECIAL_CHARS_TEST' '!@#\$%^&*()_+-=[]{}|;:,.<>?' 'SPECIAL_CHARS_TEST special characters'
+
+        print
+        print 'Testing Unicode characters...'
+        test_var 'WELCOME_MESSAGE' '欢迎 Welcome Bienvenido' 'WELCOME_MESSAGE Unicode'
+        test_var 'EMOJI_STATUS' '✅ 🚀 💻' 'EMOJI_STATUS emojis'
+        test_var 'CURRENCY_SYMBOLS' '\$ € £ ¥ ₹' 'CURRENCY_SYMBOLS Unicode symbols'
+        test_var 'DOCUMENTS_INTL' '/home/用户/文档' 'DOCUMENTS_INTL Unicode path'
+        test_var 'PROJECTS_INTL' '/home/usuario/proyectos' 'PROJECTS_INTL international path'
+        test_var 'UNICODE_TEST' 'αβγδε ñáéíóú çñü' 'UNICODE_TEST various Unicode'
+
+        print
+        print 'Testing application configurations...'
+        test_var 'DOCKER_HOST' 'unix:///var/run/docker.sock' 'DOCKER_HOST variable'
+        test_var 'COMPOSE_PROJECT_NAME' 'myapp' 'COMPOSE_PROJECT_NAME variable'
+        test_var 'DATABASE_URL' 'postgresql://localhost:5432/myapp_dev' 'DATABASE_URL variable'
+        test_var 'REDIS_URL' 'redis://localhost:6379/0' 'REDIS_URL variable'
+        test_var 'MONGODB_URL' 'mongodb://localhost:27017/myapp' 'MONGODB_URL variable'
+        test_var 'API_KEY' 'sk-1234567890abcdef' 'API_KEY variable'
+        test_var 'JWT_SECRET' 'super-secret-jwt-key-change-in-production' 'JWT_SECRET variable'
+        test_var 'GITHUB_TOKEN' 'ghp_1234567890abcdef' 'GITHUB_TOKEN variable'
+
+        # Print summary
+        print
+        print 'Test Summary:'
+        print '============='
+        print -P \"Total tests: \$TEST_COUNT\"
+        print -P '${GREEN}Passed: '\$PASS_COUNT'${NC}'
+        print -P '${RED}Failed: '\$FAIL_COUNT'${NC}'
+
+        if [[ \$FAIL_COUNT -eq 0 ]]; then
+            print -P '${GREEN}All tests passed!${NC}'
+            exit 0
+        else
+            print -P '${RED}Some tests failed.${NC}'
+            exit 1
+        fi
+    "
 }
 
 # Run tests if script is executed directly

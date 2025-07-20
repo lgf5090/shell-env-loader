@@ -77,13 +77,10 @@ load_env_file() {
     # Extract unique base names
     base_names=$(extract_base_names "$parsed_vars")
     
-    # Process each base name (use zsh array processing)
-    local -a base_name_array
-    base_name_array=(${(f)base_names})
-    
-    for base_name in $base_name_array; do
+    # Process each base name (use bash-compatible method)
+    while IFS= read -r base_name; do
         [[ -z "$base_name" ]] && continue
-        
+
         # Find all candidates for this base name using zsh pattern matching
         local -a parsed_lines candidates_array
         parsed_lines=(${(f)parsed_vars})
@@ -162,7 +159,7 @@ load_env_file() {
                 esac
             fi
         fi
-    done
+    done <<< "$base_names"
 }
 
 # Load environment variables from all files in hierarchy
