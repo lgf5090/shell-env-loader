@@ -4,9 +4,11 @@
 # POSIX-compatible parsing utilities for .env files
 # Handles KEY=value format, comments, quotes, and special characters
 
-# Source required utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SCRIPT_DIR/platform.sh"
+# Source required utilities (only if not already loaded)
+if ! command -v detect_platform >/dev/null 2>&1; then
+    PARSER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    . "$PARSER_SCRIPT_DIR/platform.sh"
+fi
 
 # Parse a single line from .env file
 # Usage: parse_env_line <line> <line_number> <file_path>
@@ -241,13 +243,13 @@ resolve_variable_precedence() {
     shell_type="$(detect_shell)"
     platform="$(detect_platform)"
     
-    # Process each candidate
-    echo "$candidates" | while IFS= read -r candidate; do
+    # Process each candidate (avoid subshell to preserve variables)
+    while IFS= read -r candidate; do
         [ -z "$candidate" ] && continue
-        
+
         name="${candidate%%=*}"
         value="${candidate#*=}"
-        
+
         # Only consider candidates that match the base name
         case "$name" in
             "$base_name"|"${base_name}_"*)
@@ -258,8 +260,8 @@ resolve_variable_precedence() {
                 fi
                 ;;
         esac
-    done
-    
+    done <<< "$candidates"
+
     echo "$best_value"
 }
 
@@ -272,11 +274,11 @@ extract_base_names() {
     local name base_name
     local seen_names=""
     
-    echo "$variables" | while IFS= read -r line; do
+    while IFS= read -r line; do
         [ -z "$line" ] && continue
-        
+
         name="${line%%=*}"
-        
+
         # Extract base name (remove suffixes)
         case "$name" in
             *_BASH|*_ZSH|*_FISH|*_NU|*_PS|*_UNIX|*_LINUX|*_MACOS|*_WIN|*_WSL)
@@ -286,7 +288,7 @@ extract_base_names() {
                 base_name="$name"
                 ;;
         esac
-        
+
         # Only output each base name once
         case "$seen_names" in
             *"|$base_name|"*) ;;
@@ -295,7 +297,7 @@ extract_base_names() {
                 echo "$base_name"
                 ;;
         esac
-    done
+    done <<< "$variables"
 }
 
 # Debug function to print parsing information

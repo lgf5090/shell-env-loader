@@ -4,9 +4,11 @@
 # POSIX-compatible functions for managing .env file hierarchy
 # Handles the three-tier loading system: global -> user -> project
 
-# Source platform detection utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-. "$SCRIPT_DIR/platform.sh"
+# Source platform detection utilities (only if not already loaded)
+if ! command -v detect_platform >/dev/null 2>&1; then
+    HIERARCHY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    . "$HIERARCHY_SCRIPT_DIR/platform.sh"
+fi
 
 # Get the list of .env files in hierarchical order (lowest to highest priority)
 # Usage: get_env_file_hierarchy
