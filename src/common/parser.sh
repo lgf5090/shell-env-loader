@@ -154,77 +154,80 @@ parse_env_file() {
 # Get variable precedence score based on suffixes
 # Usage: get_variable_precedence <variable_name> <shell_type> <platform>
 # Returns: Numeric precedence score (higher = higher priority)
+# Priority order: Shell-specific > Platform-specific > Generic
+# For platforms: WSL > LINUX > UNIX > generic (on Linux/WSL)
+#                MACOS > UNIX > generic (on macOS)
+#                WIN > generic (on Windows)
 get_variable_precedence() {
     local var_name="$1"
     local shell_type="$2"
     local platform="$3"
     local base_name suffix
     local score=0
-    
+
     # Extract base name and suffix
     case "$var_name" in
         *_BASH|*_ZSH|*_FISH|*_NU|*_PS)
             suffix="${var_name##*_}"
             base_name="${var_name%_*}"
-            # Shell-specific variables get highest priority
+            # Shell-specific variables get highest priority (1000+)
             if [ "$suffix" = "$shell_type" ]; then
-                score=100
+                score=1000
             else
-                score=0  # Wrong shell suffix
+                score=0  # Wrong shell suffix - completely ignore
             fi
             ;;
         *_UNIX|*_LINUX|*_MACOS|*_WIN|*_WSL)
             suffix="${var_name##*_}"
             base_name="${var_name%_*}"
-            # Platform-specific variables get medium priority
+            # Platform-specific variables get medium priority (100-500)
             case "$platform" in
                 WSL)
-                    if [ "$suffix" = "WSL" ] || [ "$suffix" = "LINUX" ] || [ "$suffix" = "UNIX" ]; then
-                        score=50
-                    else
-                        score=0
-                    fi
+                    case "$suffix" in
+                        WSL) score=500 ;;      # Most specific for WSL
+                        LINUX) score=400 ;;   # Linux compatibility
+                        UNIX) score=300 ;;    # Unix compatibility
+                        *) score=0 ;;         # Other platforms ignored
+                    esac
                     ;;
                 LINUX)
-                    if [ "$suffix" = "LINUX" ] || [ "$suffix" = "UNIX" ]; then
-                        score=50
-                    else
-                        score=0
-                    fi
+                    case "$suffix" in
+                        LINUX) score=400 ;;   # Most specific for Linux
+                        UNIX) score=300 ;;    # Unix compatibility
+                        *) score=0 ;;         # Other platforms ignored
+                    esac
                     ;;
                 MACOS)
-                    if [ "$suffix" = "MACOS" ] || [ "$suffix" = "UNIX" ]; then
-                        score=50
-                    else
-                        score=0
-                    fi
+                    case "$suffix" in
+                        MACOS) score=400 ;;   # Most specific for macOS
+                        UNIX) score=300 ;;    # Unix compatibility
+                        *) score=0 ;;         # Other platforms ignored
+                    esac
                     ;;
                 WIN)
-                    if [ "$suffix" = "WIN" ]; then
-                        score=50
-                    else
-                        score=0
-                    fi
+                    case "$suffix" in
+                        WIN) score=400 ;;     # Most specific for Windows
+                        *) score=0 ;;         # Other platforms ignored
+                    esac
                     ;;
                 UNIX)
-                    if [ "$suffix" = "UNIX" ]; then
-                        score=50
-                    else
-                        score=0
-                    fi
+                    case "$suffix" in
+                        UNIX) score=300 ;;    # Generic Unix
+                        *) score=0 ;;         # Other platforms ignored
+                    esac
                     ;;
                 *)
-                    score=0
+                    score=0  # Unknown platform
                     ;;
             esac
             ;;
         *)
-            # Generic variables get low priority
+            # Generic variables get lowest priority (10)
             base_name="$var_name"
             score=10
             ;;
     esac
-    
+
     echo "$score"
 }
 

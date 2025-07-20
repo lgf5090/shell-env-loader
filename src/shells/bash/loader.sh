@@ -88,12 +88,62 @@ load_env_file() {
                 best_value=$(expand_environment_variables "$best_value")
             fi
 
-            # Set the environment variable
-            set_environment_variable "$base_name" "$best_value"
+            # Special handling for PATH variables
+            case "$base_name" in
+                PATH_ADDITION)
+                    # Expand tilde and variables in PATH addition
+                    if echo "$best_value" | grep -q '~'; then
+                        best_value=$(echo "$best_value" | sed "s|~|$HOME|g")
+                    fi
+                    if echo "$best_value" | grep -q '\$'; then
+                        best_value=$(expand_environment_variables "$best_value")
+                    fi
+                    # Append to existing PATH
+                    if [ -n "$PATH" ]; then
+                        best_value="$PATH:$best_value"
+                    fi
+                    set_environment_variable "PATH" "$best_value"
+                    ;;
+                PATH_EXPORT)
+                    # Direct PATH replacement (already includes $PATH)
+                    # Expand tilde and variables
+                    if echo "$best_value" | grep -q '~'; then
+                        best_value=$(echo "$best_value" | sed "s|~|$HOME|g")
+                    fi
+                    if echo "$best_value" | grep -q '\$'; then
+                        best_value=$(expand_environment_variables "$best_value")
+                    fi
+                    set_environment_variable "PATH" "$best_value"
+                    ;;
+                PATH)
+                    # Ensure all variables in PATH are expanded
+                    if echo "$best_value" | grep -q '~'; then
+                        best_value=$(echo "$best_value" | sed "s|~|$HOME|g")
+                    fi
+                    if echo "$best_value" | grep -q '\$'; then
+                        best_value=$(expand_environment_variables "$best_value")
+                    fi
+                    set_environment_variable "$base_name" "$best_value"
+                    ;;
+                *)
+                    # Regular variable
+                    set_environment_variable "$base_name" "$best_value"
+                    ;;
+            esac
 
             # Debug output
             if [ "${ENV_LOADER_DEBUG:-}" = "true" ]; then
-                echo "  Set $base_name=$best_value" >&2
+                case "$base_name" in
+                    PATH_ADDITION)
+                        echo "  Appended to PATH: $best_value" >&2
+                        ;;
+                    PATH_EXPORT)
+                        echo "  Set PATH: $best_value" >&2
+                        ;;
+                    *)
+                        echo "  Set $base_name=$best_value" >&2
+                        ;;
+                esac
             fi
         fi
     done <<< "$base_names"
@@ -224,7 +274,9 @@ init_env_loader() {
 }
 
 # Auto-initialize if this script is sourced (not executed)
-if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+# Use a flag to prevent multiple initializations
+if [ "${BASH_SOURCE[0]}" != "${0}" ] && [ -z "${ENV_LOADER_INITIALIZED:-}" ]; then
     # Script is being sourced, auto-initialize
+    export ENV_LOADER_INITIALIZED=true
     init_env_loader
 fi
