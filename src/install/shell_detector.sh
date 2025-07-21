@@ -40,6 +40,13 @@ declare -A CONFIG_PATTERNS=(
     ["pwsh"]=".config/powershell/profile.ps1 Documents/PowerShell/profile.ps1"
 )
 
+# Check if a command exists
+# Usage: command_exists <command>
+# Returns: 0 if exists, 1 if not
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
 # Check if a shell executable exists and is functional
 # Usage: is_shell_available <shell_name>
 # Returns: 0 if available, 1 if not
