@@ -95,7 +95,15 @@ def get_variable_precedence [var_name: string] {
     # Check if this is a base variable (no recognized suffix)
     let has_shell_suffix = ($var_name | str ends-with "_NUSHELL") or ($var_name | str ends-with "_NU") or ($var_name | str ends-with "_FISH") or ($var_name | str ends-with "_ZSH") or ($var_name | str ends-with "_BASH") or ($var_name | str ends-with "_PS")
     let has_platform_suffix = ($var_name | str ends-with "_WSL") or ($var_name | str ends-with "_LINUX") or ($var_name | str ends-with "_MACOS") or ($var_name | str ends-with "_WIN") or ($var_name | str ends-with "_UNIX")
-    let has_other_suffix = ($var_name | str contains "_") and (not $has_shell_suffix) and (not $has_platform_suffix)
+
+    # Check for other suffixes (like _BASIC, _PREFERRED, etc.) but exclude known base variable patterns
+    # Base variables that naturally contain underscores should not be penalized
+    # Variables that have platform-specific variants should NOT get base variable bonus
+    let platform_variant_bases = ["CONFIG_DIR", "TEMP_DIR", "SYSTEM_BIN", "DOCKER_HOST"]
+    let known_base_patterns = ["USER_HOME", "DEV_HOME", "PROJECTS_DIR", "WORKSPACE_DIR", "LOCAL_BIN", "CARGO_BIN", "GO_BIN", "PATH_ADDITION", "PATH_EXPORT", "DATABASE_URL", "REDIS_URL", "MONGODB_URL", "API_KEY", "JWT_SECRET", "GITHUB_TOKEN", "TEST_BASIC", "TEST_QUOTED", "TEST_SHELL", "TEST_PLATFORM", "SPECIAL_CHARS_TEST", "UNICODE_TEST", "PATH_TEST", "PROGRAM_FILES", "PROGRAM_FILES_X86", "DOCUMENTS_DIR", "MESSAGE_WITH_QUOTES", "SQL_QUERY", "JSON_CONFIG", "COMMAND_WITH_QUOTES", "COMPLEX_MESSAGE", "WINDOWS_PATH", "REGEX_PATTERN", "LOG_FILE", "WELCOME_MESSAGE", "EMOJI_STATUS", "CURRENCY_SYMBOLS", "DOCUMENTS_INTL", "PROJECTS_INTL", "SECRET_KEY", "DATABASE_PASSWORD", "API_TOKEN", "DB_HOST_DEV", "DB_HOST_PROD", "STRIPE_KEY_DEV", "STRIPE_KEY_PROD", "JAVA_OPTS", "NODE_OPTIONS", "PYTHON_OPTIMIZE", "TEST_ENV", "TESTING_MODE", "MOCK_EXTERNAL_APIS", "LOG_FORMAT", "LOG_TIMESTAMP", "LOG_COLOR", "GOOD_PATH", "GOOD_QUOTES", "GOOD_EXPANSION", "GOOD_RELATIVE"]
+    let is_known_base = ($known_base_patterns | any { |pattern| $var_name == $pattern })
+    let is_platform_variant_base = ($platform_variant_bases | any { |pattern| $var_name == $pattern })
+    let has_other_suffix = ($var_name | str contains "_") and (not $has_shell_suffix) and (not $has_platform_suffix) and (not $is_known_base) and (not $is_platform_variant_base)
 
     # Shell-specific bonus
     if ($var_name | str ends-with $"_($shell)") or ($var_name | str ends-with "_NU") {
@@ -135,8 +143,11 @@ def get_variable_precedence [var_name: string] {
     }
 
     # Base variable gets priority over variables with other suffixes
-    if (not $has_shell_suffix) and (not $has_platform_suffix) and (not $has_other_suffix) {
+    # Variables with platform variants get small bonus to beat non-matching platform variants
+    if (not $has_shell_suffix) and (not $has_platform_suffix) and (not $has_other_suffix) and (not $is_platform_variant_base) {
         $score = ($score + 500)  # Base variable bonus
+    } else if $is_platform_variant_base {
+        $score = ($score + 50)   # Small bonus for base variables with platform variants
     } else if $has_other_suffix {
         $score = ($score - 100)  # Penalty for other suffixes like _BASIC, _PREFERRED, etc.
     }
