@@ -27,6 +27,20 @@ CONFIG_DIR_WIN=%APPDATA%
 ```
 
 
+run_shell_tests() {
+    local shell="$1"
+    local test_file="$2"
+    
+    # Execute tests in isolated shell environments to prevent interference
+    case "$shell" in
+        bash)     bash --noprofile --norc "$test_file" ;;
+        zsh)      zsh --no-rcs --no-globalrcs "$test_file" ;;
+        fish)     fish --no-config -c "source $test_file" ;;
+        nu)       nu --no-config-file "$test_file" ;;
+        ps)       pwsh -NoProfile -NoLogo -File "$test_file" ;;
+    esac
+}
+
 
 powershell测试命令
 ```pwsh
@@ -38,7 +52,7 @@ bash --noprofile --norc tests/shells/test_bash_comprehensive.sh
 ```
 
 ```zsh
-zsh --no-rcs --no-globalrcs "tests/shells/test_zsh_comprehensive.sh"
+zsh --no-rcs --no-globalrcs "tests/shells/test_zsh_comprehensive.zsh"
 ```
 
 
@@ -50,7 +64,17 @@ bash --noprofile --norc "tests/shells/test_bzsh_comprehensive.sh"
 zsh --no-rcs --no-globalrcs "tests/shells/test_bzsh_comprehensive.sh"
 ```
 
+```fish
+fish --no-config -c "source tests/shells/test_fish_comprehensive.fish"
+```
 
+```pwsh
+pwsh -NoProfile -NoLogo -File  "tests/shells/test_pwsh_comprehensive.ps1"
+```
+
+```nu
+nu --no-config-file "tests/shells/test_nu_comprehensive.nu"
+```
 
 
 
