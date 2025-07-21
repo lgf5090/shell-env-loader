@@ -133,8 +133,8 @@ create_config_backup() {
     local config_file
     local backup_file
 
-    load_shell_detector || return 1
-    config_file=$(get_default_config_file "$shell_name")
+    load_shell_detector || true  # Don't fail if shell detector can't load
+    config_file=$(get_config_file_fallback "$shell_name")
 
     if [ ! -f "$config_file" ]; then
         return 0  # No file to backup
@@ -165,7 +165,7 @@ rollback_installation() {
 
     # Restore configuration file if backup exists
     if [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
-        local config_file=$(get_default_config_file "$shell_name")
+        local config_file=$(get_config_file_fallback "$shell_name")
         if cp "$backup_file" "$config_file"; then
             success "Restored configuration from backup: $backup_file"
         else
@@ -182,6 +182,30 @@ rollback_installation() {
     success "Rollback completed for $shell_name"
 }
 
+# Get default config file with fallback
+get_config_file_fallback() {
+    local shell_name="$1"
+
+    # Try shell_detector first if available
+    if [ "$SHELL_DETECTOR_LOADED" = "true" ]; then
+        local config_file=$(get_default_config_file "$shell_name" 2>/dev/null)
+        if [ -n "$config_file" ]; then
+            echo "$config_file"
+            return 0
+        fi
+    fi
+
+    # Fallback to hardcoded paths
+    case "$shell_name" in
+        bash) echo "$HOME/.bashrc" ;;
+        zsh) echo "$HOME/.zshrc" ;;
+        fish) echo "$HOME/.config/fish/config.fish" ;;
+        nu) echo "$HOME/.config/nushell/config.nu" ;;
+        pwsh) echo "$HOME/.config/powershell/profile.ps1" ;;
+        *) echo "" ;;
+    esac
+}
+
 # Simple validation function
 validate_shell_installation() {
     local shell_name="$1"
@@ -189,7 +213,7 @@ validate_shell_installation() {
     info "Validating $shell_name installation..."
 
     # Ensure shell detector is loaded
-    load_shell_detector || return 1
+    load_shell_detector || true  # Don't fail if shell detector can't load
 
     # Check if shell directory exists
     if [ ! -d "$INSTALL_DIR/$shell_name" ]; then
@@ -198,7 +222,7 @@ validate_shell_installation() {
     fi
 
     # Check if config integration exists
-    local config_file=$(get_default_config_file "$shell_name")
+    local config_file=$(get_config_file_fallback "$shell_name")
     if [ ! -f "$config_file" ]; then
         error "Configuration file not found: $config_file"
         return 1
@@ -491,7 +515,7 @@ install_bash() {
     fi
 
     # Get config file
-    local config_file=$(get_default_config_file "bash")
+    local config_file=$(get_config_file_fallback "bash")
 
     # Check if already installed
     if [ "$FORCE_INSTALL" != "true" ] && grep -q "env-loader" "$config_file" 2>/dev/null; then
@@ -549,7 +573,7 @@ install_zsh() {
     fi
 
     # Get config file
-    local config_file=$(get_default_config_file "zsh")
+    local config_file=$(get_config_file_fallback "zsh")
 
     # Check if already installed
     if [ "$FORCE_INSTALL" != "true" ] && grep -q "env-loader" "$config_file" 2>/dev/null; then
@@ -607,7 +631,7 @@ install_fish() {
     fi
 
     # Get config file
-    local config_file=$(get_default_config_file "fish")
+    local config_file=$(get_config_file_fallback "fish")
     local config_dir=$(dirname "$config_file")
 
     # Create config directory if it doesn't exist
