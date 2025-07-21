@@ -260,12 +260,54 @@ def load_env_file [file_path: string] {
                     $best_value
                 }
                 
-                # Set the variable
-                let success = (set_environment_variable $base_name $expanded_value)
-                
-                # Debug output
-                if ($env.ENV_LOADER_DEBUG? | default false) == "true" and $success {
-                    print $"  Set ($base_name)=($expanded_value)"
+                # Special handling for PATH variables
+                match $base_name {
+                    "PATH_ADDITION" => {
+                        # Append to existing PATH using load-env
+                        let path_additions = ($expanded_value | split row ":")
+                        let current_path = $env.PATH
+                        let new_path = ($current_path | append $path_additions)
+                        load-env {PATH: $new_path}
+
+                        # Also set the variable for reference
+                        load-env {$base_name: $expanded_value}
+
+                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+                            print $"  Appended to PATH: ($expanded_value)"
+                            print $"  New PATH length: ($new_path | length)"
+                        }
+                    }
+                    "PATH_EXPORT" => {
+                        # Handle PATH export (usually contains $PATH reference)
+                        # For now, just set as variable since it's shell-specific
+                        load-env {$base_name: $expanded_value}
+
+                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+                            print $"  Set PATH_EXPORT: ($expanded_value)"
+                        }
+                    }
+                    "PATH" => {
+                        # Direct PATH replacement
+                        if ($expanded_value | str contains ":") {
+                            let path_entries = ($expanded_value | split row ":")
+                            load-env {PATH: $path_entries}
+                        } else {
+                            load-env {PATH: [$expanded_value]}
+                        }
+
+                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+                            print $"  Set PATH: ($expanded_value)"
+                        }
+                    }
+                    _ => {
+                        # Regular variable
+                        let success = (set_environment_variable $base_name $expanded_value)
+
+                        # Debug output
+                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" and $success {
+                            print $"  Set ($base_name)=($expanded_value)"
+                        }
+                    }
                 }
             }
         }
