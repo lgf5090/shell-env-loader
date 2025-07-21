@@ -48,8 +48,20 @@ error() {
     log "ERROR: $*"
 }
 
-# Source shell detector
-source "$SCRIPT_DIR/src/install/shell_detector.sh"
+# Source shell detector (will be loaded after download if needed)
+SHELL_DETECTOR_LOADED=false
+
+load_shell_detector() {
+    if [ "$SHELL_DETECTOR_LOADED" = "false" ]; then
+        if [ -f "$SCRIPT_DIR/src/install/shell_detector.sh" ]; then
+            source "$SCRIPT_DIR/src/install/shell_detector.sh"
+            SHELL_DETECTOR_LOADED=true
+        else
+            error "Cannot find shell_detector.sh"
+            return 1
+        fi
+    fi
+}
 
 # Source validator functions (inline to avoid path issues)
 INSTALL_DIR="$HOME/.local/share/env-loader"
@@ -193,6 +205,15 @@ EOF
 need_download() {
     # If src directory doesn't exist, we need to download
     [ ! -d "$SCRIPT_DIR/src" ]
+}
+
+# Check if this is an online installation (script downloaded via curl/wget)
+is_online_installation() {
+    # Check if we're running from a temporary directory or if src doesn't exist
+    case "$SCRIPT_DIR" in
+        /tmp/*) return 0 ;;  # Running from temp directory
+        *) [ ! -d "$SCRIPT_DIR/src" ] ;;  # No src directory
+    esac
 }
 
 # Download files from GitHub
@@ -726,13 +747,20 @@ main() {
 
     # Download files from GitHub if needed
     if need_download; then
-        info "Detected online installation mode - downloading files from GitHub..."
+        if is_online_installation; then
+            info "Detected online installation mode - downloading files from GitHub..."
+        else
+            info "Detected missing files - downloading from GitHub..."
+        fi
         download_from_github || exit 1
         # Set up cleanup trap
         trap cleanup_temp_files EXIT
     else
         info "Detected local installation mode - using existing files..."
     fi
+
+    # Load shell detector after files are available
+    load_shell_detector || exit 1
     
     # Determine shells to install
     local shells_to_process=()
