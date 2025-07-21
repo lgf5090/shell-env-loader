@@ -194,6 +194,7 @@ get_variable_precedence() {
                     ;;
                 LINUX)
                     case "$suffix" in
+                        WSL) score=500 ;;      # WSL is more specific than Linux
                         LINUX) score=400 ;;   # Most specific for Linux
                         UNIX) score=300 ;;    # Unix compatibility
                         *) score=0 ;;         # Other platforms ignored
