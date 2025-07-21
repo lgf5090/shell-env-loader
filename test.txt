@@ -1,0 +1,239 @@
+[18:32:02] lgf@debian …/shell-env-loader on  main +9/-4 [📦1!1?9⇡2] took 3s 
+🚀 bash
+
+[18:35:26] lgf@debian …/shell-env-loader on  main +9/-4 [📦1!1?10⇡2] 
+🚀 chmod +x debug_bashrc.sh && ./debug_bashrc.sh
+=== Debugging .bashrc Loading ===
+=== Current Environment ===
+PWD: /home/lgf/Desktop/code/augment/shell-env-loader
+HOME: /home/lgf
+SHELL: /usr/bin/zsh
+test_env_loader: NOT SET
+ENV_LOADER_INITIALIZED: true
+
+=== .bashrc Content Around env-loader ===
+Lines around env-loader configuration:
+14-[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path bash)"
+15-
+16-# Cross-Shell Environment Loader (Bash)
+17-# =====================================
+18-# Automatically load environment variables from .env files
+19:if [ -f "$HOME/.local/share/env-loader/bash/loader.sh" ]; then
+20:    source "$HOME/.local/share/env-loader/bash/loader.sh"
+21-fi
+22-
+23-
+24-
+25-# starship prompt configuration
+
+=== Manual Step-by-Step Test ===
+Step 1: Check if loader file exists
+✅ Loader file exists: /home/lgf/.local/share/env-loader/bash/loader.sh
+Step 2: Test the condition from .bashrc
+✅ .bashrc condition is TRUE
+Step 3: Source the loader with debug
+Before sourcing:
+  test_env_loader: NOT SET
+  ENV_LOADER_INITIALIZED: true
+After sourcing:
+  test_env_loader: NOT SET
+  ENV_LOADER_INITIALIZED: true
+
+=== Test .bashrc Sourcing with Debug ===
+Before .bashrc:
+  test_env_loader: NOT SET
+  ENV_LOADER_INITIALIZED: NOT SET
+Sourcing only the env-loader part of .bashrc...
+  Set EDITOR=vim
+  Set VISUAL=vim
+  Set PAGER=less
+  Set TERM=xterm-256color
+  Set COLORTERM=truecolor
+  Set USER_HOME=/home/lgf
+  Set CONFIG_DIR=~/.config
+  Set TEMP_DIR=/tmp
+  Set SYSTEM_BIN=/usr/local/bin
+  Set NODE_VERSION=18.17.0
+  Set PYTHON_VERSION=3.11.0
+  Set GO_VERSION=1.21.0
+  Set DEV_HOME=~/Development
+  Set PROJECTS_DIR=~/Projects
+  Set WORKSPACE_DIR=~/workspace
+  Set GIT_EDITOR=vim
+  Set GIT_PAGER=less
+  Set GIT_DEFAULT_BRANCH=main
+  Set LOCAL_BIN=~/.local/bin
+  Set CARGO_BIN=~/.cargo/bin
+  Set GO_BIN=~/go/bin
+  Appended to PATH: /home/lgf/.npm-global/bin:/home/lgf/go/bin:/usr/local/go/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/home/lgf/.cargo/bin:/home/lgf/.local/bin:/opt/miniconda3/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/snap/bin:/home/lgf/.dotnet/tools:/home/lgf/.config/Code/User/globalStorage/github.copilot-chat/debugCommand:/usr/local/bin:/snap/bin:/tmp/test_linux_path
+  Set DOCKER_HOST=unix:///var/run/docker.sock
+  Set COMPOSE_PROJECT_NAME=myproject
+  Set DATABASE_URL=postgresql://localhost:5432/mydb
+  Set REDIS_URL=redis://localhost:6379
+  Set MONGODB_URL=mongodb://localhost:27017/mydb
+  Set API_KEY=your_api_key_here
+  Set JWT_SECRET=your_jwt_secret_here
+  Set GITHUB_TOKEN=ghp_your_github_token_here
+  Set PROGRAM_FILES=C:\\Program Files
+  Set PROGRAM_FILES_X86=C:\\Program Files (x86)
+  Set DOCUMENTS_DIR=~/Documents/My Projects
+  Set MESSAGE_WITH_QUOTES=It's a beautiful day
+  Set SQL_QUERY=SELECT * FROM users WHERE name = 'John'
+  Set JSON_CONFIG={\"debug\": true, \"port\": 3000}
+  Set COMMAND_WITH_QUOTES=echo \"Hello World\"
+  Set COMPLEX_MESSAGE=He said \"It's working!\" with excitement
+  Set WINDOWS_PATH=C:\\Users\\Developer\\AppData\\Local
+  Set REGEX_PATTERN=\\d{4}-\\d{2}-\\d{2}
+  Set WELCOME_MESSAGE=Welcome! 欢迎! Bienvenidos! Добро пожаловать!
+  Set EMOJI_STATUS=✅ Ready to go! 🚀
+  Set CURRENCY_SYMBOLS=Supported: $ € £ ¥ ₹ ₽
+  Set DOCUMENTS_INTL=~/Documents/文档
+  Set PROJECTS_INTL=~/Projets/项目
+  Set PROJECT_TYPE=personal
+  Set DEBUG_LEVEL=info
+  Set LOG_LEVEL=info
+  Set ENVIRONMENT=production
+  Set SECRET_KEY=change_me_in_production
+  Set DATABASE_PASSWORD=your_secure_password_here
+  Set API_TOKEN=replace_with_actual_token
+  Set JAVA_OPTS=-Xmx2g -Xms1g
+  Set NODE_OPTIONS=--max-old-space-size=4096
+  Set PYTHON_OPTIMIZE=1
+  Set TEST_ENV=true
+  Set TESTING_MODE=enabled
+  Set MOCK_EXTERNAL_APIS=true
+  Set DEBUG=info
+  Set VERBOSE=true
+  Set TRACE_ENABLED=false
+  Set LOG_FORMAT=json
+  Set LOG_TIMESTAMP=true
+  Set LOG_COLOR=auto
+  Set TEST_BASIC=basic_value_works
+  Set TEST_QUOTED=value with spaces works
+  Set TEST_PLATFORM=unix_detected
+  Set HIERARCHY_TEST_GLOBAL=from_global_env
+  Set SPECIAL_CHARS_TEST=!@#$%^&*()_+-=[]{}|;:,.<>?
+  Set UNICODE_TEST=Testing: αβγ 中文 العربية русский 🎉
+  Set PATH_TEST=/usr/local/bin:/opt/bin:~/.local/bin
+  Set EDITOR=nvim
+  Set BROWSER=firefox
+  Set TERMINAL=alacritty
+  Set GOPATH=/home/lgf/go
+  Set GOROOT=/usr/local/go
+  Set CARGO_HOME=/home/lgf/.cargo
+  Set RUSTUP_HOME=/home/lgf/.rustup
+  Set NODE_ENV=development
+  Set NPM_CONFIG_PREFIX=/home/lgf/.npm-global
+  Set PYTHONPATH=/home/lgf/lib/python
+  Set PIPENV_VENV_IN_PROJECT=1
+  Set JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+  Set MAVEN_HOME=/home/lgf/.maven
+  Set PATH_ADDITIONS=/snap/bin:/opt/miniconda3/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/home/lgf/.local/bin:/home/lgf/.cargo/bin:/usr/local/go/bin:/home/lgf/go/bin:/home/lgf/.npm-global/bin
+  Set ANTHROPIC_BASE_URL=https://pmpjfbhq.cn-nb1.rainapp.top
+  Set ANTHROPIC_AUTH_TOKEN=sk-wdiEPDhRCUxQWUV8p9CpSLNdLhj9Z2rLjh9lMSEeo4KBhhQ5
+  Set CO_API_KEY=uVwXZl9N2gKnJ6BXldWwyxrtBT3VV9xfmdG3SKFk
+  Set rovo_q5090_email=lgf5090@qq.com
+  Set rovo_q5090_token=ATATT3xFfGF0tFGIx---nBhkhvYoTp3tXo78yO8z-UkKFkKXANJNinWs=CD9C4D1C
+  Set rovo_o5090_email=lgf5090@outlook.com
+  Set rovo_o5090_token=ATATT3xFfGF0n3wqoYETrm96Cf_WdrHoPi0e8LCtYp1kZifCY=1F0D9740
+  Set rovo_5090_email=lgf5090@gmail.com
+  Set rovo_5090_token=ATATT3xFfGF0yStLH_a-55CKIDppBGBjPXaHXFm7v6Ur6891fwPNclTE=54350928
+  Set rovo_14591_email=lgf14591@gmail.com
+  Set rovo_14591_token=ATATT3xFfGF0DKDUEMQ0bVE5_dzII5nNV-uE60rkyO2oTzhfCDs_e_8PqVFPJYew=D2E1C246
+  Set rovo_5481_email=lgf5481@gmail.com
+  Set rovo_5481_token=ATATT3xFfGF08aYiZbTWLJuUXaWN3NXJ57Dkuza9yYbT8t-MVi62jCQLqAt0Io9kdNMqsUBHY=DD7C4B75
+  Set rovo_4470_email=lgf4470@gmail.com
+  Set rovo_4470_token=ATATT3xFfGF0Igqo80e5dHjYLYZX7CRgnA_cGEhT4x6Rmd0FRlfnLffLOrkHWGEBk=5E5508CA
+  Set rovo_9697_email=lgf9697@gmail.com
+  Set rovo_9697_token=ATATT3xFfGF0KUKPBZ6yY4oEGZWv-08Klq6Ifp-nHzfLxDcjR1RSeZ2jhfNQtHMkoiRGY=A72A337A
+  Set rovo_0932_email=lgf0932@gmail.com
+  Set rovo_0932_token=ATATT3xFfGF0zawh4KyiO--JAuk9zHf--S1G-orIRWQVQXKKJEE=61FE3357
+  Set rovo_6491_email=lgf6491@gmail.com
+  Set rovo_6491_token=ATATT3xFfGF0Qlz6c0Fsow2BRIRdMwY25OQGGm2HPCXlzQmjMxtUZ_yD2YOPdTY71GQDcw=77566E89
+  Set rovo_42663_email=lgf42663@gmail.com
+  Set rovo_42663_token=ATATT3xFfGF0OFZJZzXC_zeqI3yxa21Dkc8-3Z-V8PDAmd99rNWr7-gmmC9v3CU0MCcloJxs=577528D9
+  Set EDITOR=vim
+  Set VISUAL=vim
+  Set PAGER=less
+  Set TERM=xterm-256color
+  Set COLORTERM=truecolor
+  Set NODE_VERSION=18.17.0
+  Set PYTHON_VERSION=3.11.4
+  Set GO_VERSION=1.21.0
+  Set GIT_DEFAULT_BRANCH=main
+  Set TEST_SHELL=bash_detected
+  Set HISTSIZE=10000
+  Set HISTFILESIZE=20000
+  Set HISTCONTROL=ignoredups:erasedups
+  Set TEST_PLATFORM=unix_detected
+  Set ENVIRONMENT=development
+  Set DEBUG_LEVEL=debug
+  Set PROJECT_TYPE=work
+  Set HIERARCHY_TEST_GLOBAL=from_global_env
+  Set HIERARCHY_TEST_USER=from_user_confs
+  Set HIERARCHY_TEST_PROJECT=from_project_env
+  Set DOCUMENTS_DIR=/home/user/Documents
+  Set TEST_QUOTED=quoted value
+  Set GOOD_PATH=/path/with spaces/file
+  Set MESSAGE_WITH_QUOTES=Single quotes with "double" inside
+  Set SQL_QUERY=SELECT * FROM users WHERE name = 'John'
+  Set JSON_CONFIG={"debug": true, "port": 3000}
+  Set COMMAND_WITH_QUOTES=echo "Hello World"
+  Set COMPLEX_MESSAGE=He said "It's working!" with excitement
+  Set GOOD_QUOTES=He said "Hello"
+  Set WINDOWS_PATH=C:\Users\Developer\AppData\Local
+  Set REGEX_PATTERN=\d{4}-\d{2}-\d{2}
+  Set SPECIAL_CHARS_TEST=!@#$%^&*()_+-=[]{}|;:,.<>?
+  Set WELCOME_MESSAGE=欢迎 Welcome Bienvenido
+  Set EMOJI_STATUS=✅ 🚀 💻
+  Set CURRENCY_SYMBOLS=$ € £ ¥ ₹
+  Set DOCUMENTS_INTL=/home/用户/文档
+  Set PROJECTS_INTL=/home/usuario/proyectos
+  Set UNICODE_TEST=αβγδε ñáéíóú çñü
+  Set DOCKER_HOST=unix:///var/run/docker.sock
+  Set COMPOSE_PROJECT_NAME=myapp
+  Set DATABASE_URL=postgresql://localhost:5432/myapp_dev
+  Set REDIS_URL=redis://localhost:6379/0
+  Set MONGODB_URL=mongodb://localhost:27017/myapp
+  Set API_KEY=sk-1234567890abcdef
+  Set JWT_SECRET=super-secret-jwt-key-change-in-production
+  Set GITHUB_TOKEN=ghp_1234567890abcdef
+  Set JAVA_OPTS=-Xmx2g -Xms1g
+  Set NODE_OPTIONS=--max-old-space-size=4096
+  Set PYTHON_OPTIMIZE=1
+  Set TEST_ENV=test
+  Set TESTING_MODE=enabled
+  Set MOCK_EXTERNAL_APIS=true
+  Set DEBUG=debug
+  Set VERBOSE=true
+  Set TRACE_ENABLED=false
+  Set LOG_FORMAT=json
+  Set LOG_TIMESTAMP=iso
+  Set LOG_COLOR=auto
+  Set TEST_BASIC=basic_value
+  Set PATH_TEST=/usr/local/bin:/opt/bin:~/.local/bin
+  Set CONFIG_DIR=~/.config/linux
+  Set LOCAL_BIN=~/.local/bin
+  Set CARGO_BIN=~/.cargo/bin
+  Set GO_BIN=~/go/bin
+  Appended to PATH: /home/lgf/.npm-global/bin:/home/lgf/go/bin:/usr/local/go/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/home/lgf/.cargo/bin:/home/lgf/.local/bin:/opt/miniconda3/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/snap/bin:/home/lgf/.dotnet/tools:/home/lgf/.config/Code/User/globalStorage/github.copilot-chat/debugCommand:/usr/local/bin:/snap/bin:/tmp/test_linux_path:/usr/local/bin:/snap/bin:/tmp/test_linux_path
+  Set PATH: /home/lgf/.npm-global/bin:/home/lgf/go/bin:/usr/local/go/bin:/usr/lib/jvm/java-17-openjdk-amd64/bin:/home/lgf/.cargo/bin:/home/lgf/.local/bin:/opt/miniconda3/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games:/snap/bin:/home/lgf/.dotnet/tools:/home/lgf/.config/Code/User/globalStorage/github.copilot-chat/debugCommand:/usr/local/bin:/snap/bin:/tmp/test_linux_path:/usr/local/bin:/snap/bin:/tmp/test_linux_path:/home/lgf/.local/bin:/home/lgf/.cargo/bin
+Loaded environment variables from 3 files
+After env-loader part:
+  test_env_loader: NOT SET
+  ENV_LOADER_INITIALIZED: true
+
+=== Check for Conflicts ===
+Checking if there are any conflicting configurations...
+Number of env-loader references in .bashrc:
+2
+All env-loader references:
+19:if [ -f "$HOME/.local/share/env-loader/bash/loader.sh" ]; then
+20:    source "$HOME/.local/share/env-loader/bash/loader.sh"
+
+=== Debug Complete ===
+[18:35:35] lgf@debian …/shell-env-loader on  main +9/-4 [📦1!1?10⇡2] took 5s 
+🚀 # 检查.bashrc中所有的env-loader配置
+grep -n "env-loader" ~/.bashrc
+19:if [ -f "$HOME/.local/share/env-loader/bash/loader.sh" ]; then
+20:    source "$HOME/.local/share/env-loader/bash/loader.sh"
