@@ -188,6 +188,9 @@ validate_shell_installation() {
 
     info "Validating $shell_name installation..."
 
+    # Ensure shell detector is loaded
+    load_shell_detector || return 1
+
     # Check if shell directory exists
     if [ ! -d "$INSTALL_DIR/$shell_name" ]; then
         error "Shell directory not found: $INSTALL_DIR/$shell_name"
