@@ -52,10 +52,25 @@ command_exists() {
 # Returns: 0 if available, 1 if not
 is_shell_available() {
     local shell_name="$1"
-    local patterns="${SHELL_PATTERNS[$shell_name]}"
-    
+
+    # Fallback patterns if associative array fails
+    local patterns=""
+    case "$shell_name" in
+        bash) patterns="bash" ;;
+        zsh) patterns="zsh" ;;
+        fish) patterns="fish" ;;
+        nu) patterns="nu" ;;
+        pwsh) patterns="pwsh powershell" ;;
+        *) return 1 ;;
+    esac
+
+    # Try to use associative array first, fallback to case statement
+    if [ -n "${SHELL_PATTERNS[$shell_name]:-}" ]; then
+        patterns="${SHELL_PATTERNS[$shell_name]}"
+    fi
+
     [ -z "$patterns" ] && return 1
-    
+
     for pattern in $patterns; do
         if command_exists "$pattern"; then
             # Test if the shell can execute basic commands
@@ -75,7 +90,7 @@ is_shell_available() {
             esac
         fi
     done
-    
+
     return 1
 }
 
@@ -206,13 +221,21 @@ EOF
 # Returns: Space-separated list of available shell names
 discover_available_shells() {
     local available_shells=""
-    
-    for shell_name in "${!SUPPORTED_SHELLS[@]}"; do
+
+    # Use a hardcoded list as fallback if associative array fails
+    local shells_to_check="bash zsh fish nu pwsh"
+
+    # Try to use associative array first
+    if [ "${#SUPPORTED_SHELLS[@]}" -gt 0 ]; then
+        shells_to_check="${!SUPPORTED_SHELLS[@]}"
+    fi
+
+    for shell_name in $shells_to_check; do
         if is_shell_available "$shell_name"; then
             available_shells="$available_shells $shell_name"
         fi
     done
-    
+
     echo "$available_shells" | sed 's/^ *//'
 }
 
