@@ -9,13 +9,36 @@ SCRIPT_DIR="${0:A:h}"
 
 # Source common utilities (only if not already loaded)
 if ! command -v detect_platform >/dev/null 2>&1; then
-    . "$SCRIPT_DIR/../../common/platform.sh"
+    if [[ -f "$SCRIPT_DIR/../common/platform.sh" ]]; then
+        # Installed location: ~/.local/share/env-loader/zsh/
+        . "$SCRIPT_DIR/../common/platform.sh"
+    elif [[ -f "$SCRIPT_DIR/../../common/platform.sh" ]]; then
+        # Development location: src/shells/zsh/
+        . "$SCRIPT_DIR/../../common/platform.sh"
+    else
+        echo "Error: Cannot find platform.sh for env-loader" >&2
+        return 1
+    fi
 fi
 if ! command -v get_env_file_hierarchy >/dev/null 2>&1; then
-    . "$SCRIPT_DIR/../../common/hierarchy.sh"
+    if [[ -f "$SCRIPT_DIR/../common/hierarchy.sh" ]]; then
+        . "$SCRIPT_DIR/../common/hierarchy.sh"
+    elif [[ -f "$SCRIPT_DIR/../../common/hierarchy.sh" ]]; then
+        . "$SCRIPT_DIR/../../common/hierarchy.sh"
+    else
+        echo "Error: Cannot find hierarchy.sh for env-loader" >&2
+        return 1
+    fi
 fi
 if ! command -v parse_env_file >/dev/null 2>&1; then
-    . "$SCRIPT_DIR/../../common/parser.sh"
+    if [[ -f "$SCRIPT_DIR/../common/parser.sh" ]]; then
+        . "$SCRIPT_DIR/../common/parser.sh"
+    elif [[ -f "$SCRIPT_DIR/../../common/parser.sh" ]]; then
+        . "$SCRIPT_DIR/../../common/parser.sh"
+    else
+        echo "Error: Cannot find parser.sh for env-loader" >&2
+        return 1
+    fi
 fi
 
 # Set environment variable using zsh built-ins

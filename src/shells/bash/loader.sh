@@ -7,10 +7,21 @@
 # Get the directory of this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Source common utilities
-. "$SCRIPT_DIR/../../common/platform.sh"
-. "$SCRIPT_DIR/../../common/hierarchy.sh"
-. "$SCRIPT_DIR/../../common/parser.sh"
+# Source common utilities (adjust path for installed location)
+if [ -f "$SCRIPT_DIR/../common/platform.sh" ]; then
+    # Installed location: ~/.local/share/env-loader/bash/
+    . "$SCRIPT_DIR/../common/platform.sh"
+    . "$SCRIPT_DIR/../common/hierarchy.sh"
+    . "$SCRIPT_DIR/../common/parser.sh"
+elif [ -f "$SCRIPT_DIR/../../common/platform.sh" ]; then
+    # Development location: src/shells/bash/
+    . "$SCRIPT_DIR/../../common/platform.sh"
+    . "$SCRIPT_DIR/../../common/hierarchy.sh"
+    . "$SCRIPT_DIR/../../common/parser.sh"
+else
+    echo "Error: Cannot find common utilities for env-loader" >&2
+    return 1
+fi
 
 # Set environment variable using bash built-ins
 # Usage: set_environment_variable <key> <value>

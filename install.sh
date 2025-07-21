@@ -11,6 +11,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="$HOME/.local/share/env-loader"
 LOG_FILE="/tmp/env-loader-install.log"
 
+# GitHub repository configuration
+GITHUB_REPO="https://github.com/your-username/shell-env-loader"
+GITHUB_RAW="https://raw.githubusercontent.com/your-username/shell-env-loader/main"
+TEMP_DIR="/tmp/env-loader-install-$$"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -184,21 +189,91 @@ NOTES:
 EOF
 }
 
+# Check if we need to download files from GitHub
+need_download() {
+    # If src directory doesn't exist, we need to download
+    [ ! -d "$SCRIPT_DIR/src" ]
+}
+
+# Download files from GitHub
+download_from_github() {
+    info "Downloading shell-env-loader from GitHub..."
+
+    # Check for download tools
+    local download_cmd=""
+    if command -v curl >/dev/null 2>&1; then
+        download_cmd="curl -fsSL"
+    elif command -v wget >/dev/null 2>&1; then
+        download_cmd="wget -qO-"
+    else
+        error "Neither curl nor wget found. Please install one of them."
+        return 1
+    fi
+
+    # Create temporary directory
+    mkdir -p "$TEMP_DIR"
+
+    # Download required files
+    local files=(
+        "src/common/platform.sh"
+        "src/common/hierarchy.sh"
+        "src/common/parser.sh"
+        "src/shells/bash/loader.sh"
+        "src/shells/bash/integration.sh"
+        "src/shells/zsh/loader.zsh"
+        "src/shells/zsh/integration.zsh"
+        "src/shells/fish/loader.fish"
+        "src/shells/nu/loader.nu"
+        "src/shells/pwsh/loader.ps1"
+        "src/shells/bzsh/loader.sh"
+        "src/shells/bzsh/integration.sh"
+        "src/install/shell_detector.sh"
+    )
+
+    for file in "${files[@]}"; do
+        local url="$GITHUB_RAW/$file"
+        local local_path="$TEMP_DIR/$file"
+        local dir=$(dirname "$local_path")
+
+        mkdir -p "$dir"
+
+        info "Downloading $file..."
+        if ! $download_cmd "$url" > "$local_path"; then
+            error "Failed to download $file"
+            rm -rf "$TEMP_DIR"
+            return 1
+        fi
+    done
+
+    # Update SCRIPT_DIR to point to temp directory
+    SCRIPT_DIR="$TEMP_DIR"
+
+    success "Successfully downloaded all files from GitHub"
+    return 0
+}
+
+# Clean up temporary files
+cleanup_temp_files() {
+    if [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+    fi
+}
+
 # Check system prerequisites
 check_prerequisites() {
     info "Checking system prerequisites..."
-    
+
     # Check if we can write to install directory
     if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
         error "Cannot create install directory: $INSTALL_DIR"
         return 1
     fi
-    
+
     # Check if we can write to log file
     if ! touch "$LOG_FILE" 2>/dev/null; then
         warning "Cannot write to log file: $LOG_FILE"
     fi
-    
+
     # Check for required commands
     local required_commands="cp mkdir chmod"
     for cmd in $required_commands; do
@@ -207,7 +282,7 @@ check_prerequisites() {
             return 1
         fi
     done
-    
+
     success "System prerequisites check passed"
     return 0
 }
@@ -252,12 +327,14 @@ copy_shell_files() {
     # Copy shell-specific files
     case "$shell_name" in
         bash)
-            cp "$SCRIPT_DIR/src/shells/bash/"* "$INSTALL_DIR/bash/" 2>/dev/null || true
+            # Copy bzsh files first, then bash-specific files (so bash files take precedence)
             cp "$SCRIPT_DIR/src/shells/bzsh/"* "$INSTALL_DIR/bash/" 2>/dev/null || true
+            cp "$SCRIPT_DIR/src/shells/bash/"* "$INSTALL_DIR/bash/" 2>/dev/null || true
             ;;
         zsh)
-            cp "$SCRIPT_DIR/src/shells/zsh/"* "$INSTALL_DIR/zsh/" 2>/dev/null || true
+            # Copy bzsh files first, then zsh-specific files (so zsh files take precedence)
             cp "$SCRIPT_DIR/src/shells/bzsh/"* "$INSTALL_DIR/zsh/" 2>/dev/null || true
+            cp "$SCRIPT_DIR/src/shells/zsh/"* "$INSTALL_DIR/zsh/" 2>/dev/null || true
             ;;
         fish)
             cp "$SCRIPT_DIR/src/shells/fish/"* "$INSTALL_DIR/fish/" 2>/dev/null || true
@@ -646,6 +723,13 @@ main() {
     
     # Check prerequisites
     check_prerequisites || exit 1
+
+    # Download files from GitHub if needed
+    if need_download; then
+        download_from_github || exit 1
+        # Set up cleanup trap
+        trap cleanup_temp_files EXIT
+    fi
     
     # Determine shells to install
     local shells_to_process=()
