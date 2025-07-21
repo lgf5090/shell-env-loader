@@ -63,6 +63,65 @@ load_shell_detector() {
     fi
 }
 
+# Simple shell detection for basic functionality (used when shell_detector.sh is not available)
+simple_shell_detection() {
+    case "$1" in
+        discover_available_shells)
+            local shells=""
+            for shell in bash zsh fish nu pwsh; do
+                if command -v "$shell" >/dev/null 2>&1; then
+                    shells="$shells $shell"
+                fi
+            done
+            echo "$shells" | sed 's/^ *//'
+            ;;
+        is_shell_available)
+            command -v "$2" >/dev/null 2>&1
+            ;;
+        get_default_config_file)
+            case "$2" in
+                bash) echo "$HOME/.bashrc" ;;
+                zsh) echo "$HOME/.zshrc" ;;
+                fish) echo "$HOME/.config/fish/config.fish" ;;
+                nu) echo "$HOME/.config/nushell/config.nu" ;;
+                pwsh) echo "$HOME/.config/powershell/profile.ps1" ;;
+                *) echo "" ;;
+            esac
+            ;;
+        check_shell_compatibility)
+            # Basic compatibility check - just return true for now
+            return 0
+            ;;
+        generate_shell_report)
+            echo "Cross-Shell Environment Loader - System Check"
+            echo "============================================="
+            echo ""
+            echo "Platform: $(uname -s)"
+            echo "Architecture: $(uname -m)"
+            echo "Current Shell: $(basename "$SHELL")"
+            echo ""
+            echo "Available Shells:"
+            local available_shells=$(simple_shell_detection discover_available_shells)
+            if [ -n "$available_shells" ]; then
+                for shell in $available_shells; do
+                    local version=""
+                    case "$shell" in
+                        bash) version=$($shell --version 2>/dev/null | head -1 | cut -d' ' -f4 | cut -d'(' -f1) ;;
+                        zsh) version=$($shell --version 2>/dev/null | cut -d' ' -f2) ;;
+                        fish) version=$($shell --version 2>/dev/null | cut -d' ' -f3) ;;
+                        nu) version=$($shell --version 2>/dev/null | head -1 | cut -d' ' -f2) ;;
+                        pwsh) version=$($shell --version 2>/dev/null | head -1 | cut -d' ' -f2) ;;
+                    esac
+                    echo "  ✅ $shell${version:+ ($version)}"
+                done
+            else
+                echo "  ❌ No supported shells found"
+            fi
+            echo ""
+            ;;
+    esac
+}
+
 # Source validator functions (inline to avoid path issues)
 INSTALL_DIR="$HOME/.local/share/env-loader"
 BACKUP_DIR="$HOME/.local/share/env-loader/backups"
@@ -74,6 +133,7 @@ create_config_backup() {
     local config_file
     local backup_file
 
+    load_shell_detector || return 1
     config_file=$(get_default_config_file "$shell_name")
 
     if [ ! -f "$config_file" ]; then
@@ -162,13 +222,19 @@ declare -A SHELL_INSTALLERS=(
 # Show usage information
 show_usage() {
     cat << EOF
-Cross-Shell Environment Loader - Installation Script
-===================================================
+Cross-Shell Environment Loader - Universal Installation Script
+=============================================================
+
+🌐 ONLINE INSTALLATION (recommended):
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash
+
+🏠 LOCAL INSTALLATION:
+    git clone https://github.com/lgf5090/shell-env-loader.git && cd shell-env-loader && ./install.sh
 
 Usage: $0 [OPTIONS] [SHELLS...]
 
 OPTIONS:
-    --all               Install for all available shells
+    --all               Install for all available shells (recommended)
     --list              List available shells on this system
     --check             Check system compatibility
     --validate          Validate existing installations
@@ -179,12 +245,28 @@ OPTIONS:
 
 SHELLS:
     bash                Install for Bash shell
-    zsh                 Install for Zsh shell  
+    zsh                 Install for Zsh shell
     fish                Install for Fish shell
     nu                  Install for Nushell
     pwsh                Install for PowerShell
 
-EXAMPLES:
+ONLINE INSTALLATION EXAMPLES:
+    # Install for all available shells (recommended)
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash
+
+    # Install for specific shells
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- bash zsh
+
+    # Install for all shells non-interactively
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- --all
+
+    # Check system compatibility
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- --check
+
+    # List available shells
+    curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- --list
+
+LOCAL INSTALLATION EXAMPLES:
     $0 --all                    # Install for all available shells
     $0 bash zsh                 # Install for Bash and Zsh only
     $0 --check                  # Check system compatibility
@@ -193,6 +275,8 @@ EXAMPLES:
     $0 --uninstall bash zsh     # Uninstall from Bash and Zsh
 
 NOTES:
+    - 🌐 Online installation automatically downloads all necessary files from GitHub
+    - 🏠 Local installation uses existing files in the repository
     - Installation requires write access to ~/.local/share/ and shell config files
     - Backup files are created automatically before modification
     - Use --force to reinstall over existing installations
@@ -678,14 +762,24 @@ parse_arguments() {
                 ;;
             --list)
                 echo "Available shells on this system:"
-                discover_available_shells | tr ' ' '\n' | sed 's/^/  /'
+                if [ "$SHELL_DETECTOR_LOADED" = "true" ]; then
+                    discover_available_shells | tr ' ' '\n' | sed 's/^/  /'
+                else
+                    simple_shell_detection discover_available_shells | tr ' ' '\n' | sed 's/^/  /'
+                fi
                 exit 0
                 ;;
             --check)
-                generate_shell_report
+                if [ "$SHELL_DETECTOR_LOADED" = "true" ]; then
+                    generate_shell_report
+                else
+                    simple_shell_detection generate_shell_report
+                fi
                 exit 0
                 ;;
             --validate)
+                # Validation requires full shell detector, so load it first
+                load_shell_detector || exit 1
                 shift
                 if [ $# -eq 0 ]; then
                     # Validate all available shells
@@ -766,7 +860,11 @@ main() {
     local shells_to_process=()
     
     if [ "$INSTALL_ALL" = true ]; then
-        readarray -t shells_to_process <<< "$(discover_available_shells | tr ' ' '\n')"
+        if [ "$SHELL_DETECTOR_LOADED" = "true" ]; then
+            readarray -t shells_to_process <<< "$(discover_available_shells | tr ' ' '\n')"
+        else
+            readarray -t shells_to_process <<< "$(simple_shell_detection discover_available_shells | tr ' ' '\n')"
+        fi
     elif [ ${#SHELLS_TO_INSTALL[@]} -gt 0 ]; then
         shells_to_process=("${SHELLS_TO_INSTALL[@]}")
     else
