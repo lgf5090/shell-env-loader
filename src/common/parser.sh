@@ -249,7 +249,11 @@ resolve_variable_precedence() {
     platform="$(detect_platform)"
     
     # Process each candidate (avoid subshell to preserve variables)
-    while IFS= read -r candidate; do
+    # Use a for loop instead of while read to avoid subshell
+    local IFS_OLD="$IFS"
+    IFS=$'\n'
+    for candidate in $candidates; do
+        IFS="$IFS_OLD"
         [ -z "$candidate" ] && continue
 
         name="${candidate%%=*}"
@@ -266,7 +270,8 @@ resolve_variable_precedence() {
                 fi
                 ;;
         esac
-    done <<< "$candidates"
+    done
+    IFS="$IFS_OLD"
 
     echo "$best_value"
 }

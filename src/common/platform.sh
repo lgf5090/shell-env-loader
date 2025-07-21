@@ -31,7 +31,25 @@ detect_platform() {
 # Detect the current shell
 # Returns: BASH, ZSH, FISH, NU, PS, or UNKNOWN
 detect_shell() {
-    # First try to detect from $0 (current shell)
+    # First try to detect from shell-specific variables (most reliable)
+    if [ -n "$BASH_VERSION" ]; then
+        echo "BASH"
+        return 0
+    elif [ -n "$ZSH_VERSION" ]; then
+        echo "ZSH"
+        return 0
+    elif [ -n "$FISH_VERSION" ]; then
+        echo "FISH"
+        return 0
+    elif [ -n "$NU_VERSION" ]; then
+        echo "NU"
+        return 0
+    elif [ -n "$PSVersionTable" ]; then
+        echo "PS"
+        return 0
+    fi
+
+    # Try to detect from $0 (current shell)
     case "${0##*/}" in
         bash|*bash*)
             echo "BASH"
@@ -54,8 +72,8 @@ detect_shell() {
             return 0
             ;;
     esac
-    
-    # Try to detect from SHELL environment variable
+
+    # Finally try to detect from SHELL environment variable (least reliable)
     case "${SHELL##*/}" in
         bash)
             echo "BASH"
@@ -78,21 +96,9 @@ detect_shell() {
             return 0
             ;;
     esac
-    
-    # Try to detect from shell-specific variables
-    if [ -n "$BASH_VERSION" ]; then
-        echo "BASH"
-    elif [ -n "$ZSH_VERSION" ]; then
-        echo "ZSH"
-    elif [ -n "$FISH_VERSION" ]; then
-        echo "FISH"
-    elif [ -n "$NU_VERSION" ]; then
-        echo "NU"
-    elif [ -n "$PSVersionTable" ]; then
-        echo "PS"
-    else
-        echo "UNKNOWN"
-    fi
+
+    # Unknown shell
+    echo "UNKNOWN"
 }
 
 # Get platform-specific suffixes in priority order

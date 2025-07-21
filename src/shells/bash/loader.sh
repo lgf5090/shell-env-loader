@@ -82,11 +82,15 @@ load_env_file() {
     base_names=$(extract_base_names "$parsed_vars")
     
     # Process each base name (avoid subshell to preserve variable assignments)
-    while IFS= read -r base_name; do
+    # Use a for loop instead of while read to avoid subshell
+    local IFS_OLD="$IFS"
+    IFS=$'\n'
+    for base_name in $base_names; do
+        IFS="$IFS_OLD"
         [ -z "$base_name" ] && continue
 
         # Find all candidates for this base name
-        candidates=$(echo "$parsed_vars" | grep "^${base_name}\(=\|_.*=\)")
+        candidates=$(echo "$parsed_vars" | grep --color=never "^${base_name}\(=\|_.*=\)")
 
         # Resolve precedence and get the best value
         best_value=$(resolve_variable_precedence "$base_name" "$candidates")
@@ -155,7 +159,8 @@ load_env_file() {
                 esac
             fi
         fi
-    done <<< "$base_names"
+    done
+    IFS="$IFS_OLD"
 }
 
 # Load environment variables from all files in hierarchy
@@ -284,8 +289,13 @@ init_env_loader() {
 
 # Auto-initialize if this script is sourced (not executed)
 # Use a flag to prevent multiple initializations
-if [ "${BASH_SOURCE[0]}" != "${0}" ] && [ -z "${ENV_LOADER_INITIALIZED:-}" ]; then
-    # Script is being sourced, auto-initialize
-    export ENV_LOADER_INITIALIZED=true
-    init_env_loader
+if [ -z "${ENV_LOADER_INITIALIZED:-}" ]; then
+    # Check if we're being sourced (not executed directly)
+    # In bash, when sourced, BASH_SOURCE[0] will be different from $0
+    # or $0 will contain 'bash' when in interactive mode
+    if [ "${BASH_SOURCE[0]}" != "${0}" ] || [[ "$0" == *"bash"* ]] || [ "$0" = "bash" ]; then
+        # Script is being sourced, auto-initialize
+        export ENV_LOADER_INITIALIZED=true
+        init_env_loader
+    fi
 fi
