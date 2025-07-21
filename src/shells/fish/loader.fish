@@ -282,16 +282,66 @@ function load_env_file
     load_env_file_simple $argv
 end
 
+# Get environment file hierarchy (Fish version)
+function get_env_file_hierarchy
+    set -l files
+
+    # Global user settings (lowest priority)
+    if test -f "$HOME/.env"; and test -r "$HOME/.env"
+        set files $files "$HOME/.env"
+    end
+
+    # User configuration directory (medium priority)
+    if test -f "$HOME/.cfgs/.env"; and test -r "$HOME/.cfgs/.env"
+        set files $files "$HOME/.cfgs/.env"
+    end
+
+    # Project-specific settings (highest priority)
+    if test -f "$PWD/.env"; and test -r "$PWD/.env"
+        set files $files "$PWD/.env"
+    end
+
+    printf '%s\n' $files
+end
+
+# Load environment variables from all files in hierarchy
+function load_env_variables
+    set -l files (get_env_file_hierarchy)
+    set -l loaded_count 0
+
+    for file in $files
+        if test -n "$file"; and test -f "$file"
+            load_env_file_simple "$file"
+            set loaded_count (math $loaded_count + 1)
+        end
+    end
+
+    if test "$ENV_LOADER_DEBUG" = "true"
+        echo "Loaded environment variables from $loaded_count files" >&2
+    end
+end
+
+# Initialize the environment loader
+function init_env_loader
+    load_env_variables
+end
+
 # Test function
 function test_fish_loader
     echo "Testing Fish loader..." >&2
     set -gx ENV_LOADER_DEBUG true
-    
+
     # Test basic loading
     set -e TEST_BASIC EDITOR
     load_env_file_simple .env.example
-    
+
     echo "Results:" >&2
     echo "  EDITOR: [$EDITOR]" >&2
     echo "  TEST_BASIC: [$TEST_BASIC]" >&2
+end
+
+# Auto-initialize if this script is sourced
+if not set -q ENV_LOADER_INITIALIZED
+    set -gx ENV_LOADER_INITIALIZED true
+    init_env_loader
 end

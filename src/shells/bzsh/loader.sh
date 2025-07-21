@@ -9,8 +9,9 @@ if [ -n "${BASH_SOURCE[0]}" ]; then
     # Bash
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 elif [ -n "${(%):-%x}" ]; then
-    # Zsh
-    SCRIPT_DIR="${${(%):-%x}:A:h}"
+    # Zsh - use safer method for sourced scripts
+    local script_path="${(%):-%x}"
+    SCRIPT_DIR="${script_path:A:h}"
 else
     # Fallback
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
