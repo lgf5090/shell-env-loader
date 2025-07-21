@@ -241,7 +241,7 @@ resolve_variable_precedence() {
     local base_name="$1"
     local candidates="$2"
     local shell_type platform
-    local best_score=0
+    local best_score=-1
     local best_value=""
     local candidate name value score
     
@@ -259,7 +259,8 @@ resolve_variable_precedence() {
         case "$name" in
             "$base_name"|"${base_name}_"*)
                 score=$(get_variable_precedence "$name" "$shell_type" "$platform")
-                if [ "$score" -gt "$best_score" ]; then
+                # Only consider variables with positive scores (platform/shell appropriate)
+                if [ "$score" -gt 0 ] && [ "$score" -gt "$best_score" ]; then
                     best_score="$score"
                     best_value="$value"
                 fi

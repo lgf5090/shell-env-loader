@@ -34,6 +34,15 @@ pwsh -NoProfile -NoLogo -File  tests/shells/test_pwsh_comprehensive.ps1
 ```
 
 ```bash
+bash --noprofile --norc tests/shells/test_bash_comprehensive.sh
+```
+
+```zsh
+zsh --no-rcs --no-globalrcs "tests/shells/test_zsh_comprehensive.sh"
+```
+
+
+```bash
 bash --noprofile --norc "tests/shells/test_bzsh_comprehensive.sh"
 ```
 
