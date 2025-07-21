@@ -5,7 +5,15 @@
 # Uses zsh built-in commands for optimal performance
 
 # Get the directory of this script
-SCRIPT_DIR="${0:A:h}"
+# Use %x to get the script path when sourced, fallback to $0 when executed
+if [[ -n "${(%):-%x}" ]]; then
+    # Script is being sourced - get the actual script path
+    local script_path="${(%):-%x}"
+    SCRIPT_DIR="${script_path:A:h}"
+else
+    # Script is being executed
+    SCRIPT_DIR="${0:A:h}"
+fi
 
 # Source common utilities (only if not already loaded)
 if ! command -v detect_platform >/dev/null 2>&1; then
@@ -311,8 +319,17 @@ init_env_loader() {
 
 # Auto-initialize if this script is sourced (not executed)
 # Use a flag to prevent multiple initializations
-if [[ "${(%):-%x}" != "${(%):-%N}" ]] && [[ -z "${ENV_LOADER_INITIALIZED:-}" ]]; then
-    # Script is being sourced, auto-initialize
-    export ENV_LOADER_INITIALIZED=true
-    init_env_loader
+# Check if we're being sourced by looking at the call stack
+if [[ -z "${ENV_LOADER_INITIALIZED:-}" ]]; then
+    # Check if this is being sourced (not executed directly)
+    # In zsh, when sourced, $0 will be different from the script name
+    local script_name="${${(%):-%x}:t}"  # Get just the filename
+    local current_shell="${0:t}"         # Get current shell name
+
+    # If the current shell name doesn't match our script name, we're being sourced
+    if [[ "$current_shell" != "$script_name" ]] || [[ "$0" == *"zsh"* ]]; then
+        # Script is being sourced, auto-initialize
+        export ENV_LOADER_INITIALIZED=true
+        init_env_loader
+    fi
 fi
