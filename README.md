@@ -143,16 +143,30 @@ cd shell-env-loader
 |-------|---------------|----------|
 | **Bash** | ✅ 100% | Full feature support, advanced precedence |
 | **Zsh** | ✅ 96.4% | Native integration, Oh My Zsh compatible |
+| **Bzsh** | ✅ 100% | Bash/Zsh compatible version for both shells |
 | **Fish** | ✅ 100% | Modern syntax, user-friendly |
 | **Nushell** | ✅ 100% | Structured data, powerful scripting |
 | **PowerShell** | ✅ 98.75% | Cross-platform, Windows native |
+
+### 🔄 Installation Modes
+
+**Shell-Specific Installation:**
+- `./install.sh bash` - Installs Bash-optimized version
+- `./install.sh zsh` - Installs Zsh-optimized version
+- `./install.sh bash zsh` - Installs separate optimized versions for each
+
+**Unified Installation:**
+- `./install.sh bzsh` - Installs single compatible version for both Bash and Zsh
+- Ideal for users who switch between Bash and Zsh frequently
+- Uses shared configuration and maintains consistency
 
 ## 🔧 Installation Options
 
 ### Basic Installation
 ```bash
 ./install.sh --all                    # Install for all available shells
-./install.sh bash zsh                 # Install for specific shells
+./install.sh bash zsh                 # Install shell-specific versions for Bash and Zsh
+./install.sh bzsh                     # Install Bash/Zsh compatible version for both shells
 ./install.sh --list                   # List available shells on your system
 ```
 

@@ -73,6 +73,10 @@ simple_shell_detection() {
                     shells="$shells $shell"
                 fi
             done
+            # Add bzsh if both bash and zsh are available
+            if command -v "bash" >/dev/null 2>&1 && command -v "zsh" >/dev/null 2>&1; then
+                shells="$shells bzsh"
+            fi
             echo "$shells" | sed 's/^ *//'
             ;;
         is_shell_available)
@@ -241,6 +245,7 @@ validate_shell_installation() {
 declare -A SHELL_INSTALLERS=(
     ["bash"]="install_bash"
     ["zsh"]="install_zsh"
+    ["bzsh"]="install_bzsh"
     ["fish"]="install_fish"
     ["nu"]="install_nu"
     ["pwsh"]="install_pwsh"
@@ -273,6 +278,7 @@ OPTIONS:
 SHELLS:
     bash                Install for Bash shell
     zsh                 Install for Zsh shell
+    bzsh                Install Bash/Zsh compatible version for both shells
     fish                Install for Fish shell
     nu                  Install for Nushell
     pwsh                Install for PowerShell
@@ -603,6 +609,118 @@ EOF
     fi
 }
 
+# Install Bash/Zsh compatible integration for both shells
+install_bzsh() {
+    info "Installing Bash/Zsh compatible integration..."
+    local bash_success=false
+    local zsh_success=false
+    local total_success=0
+
+    # Ensure shell detector is loaded
+    load_shell_detector || return 1
+
+    # Install for Bash if available
+    if is_shell_available "bash"; then
+        info "Installing bzsh integration for Bash..."
+        local backup_file=""
+
+        # Create backup before making changes
+        backup_file=$(create_config_backup "bash")
+
+        # Copy bzsh files to bash directory
+        if copy_shell_files "bash"; then
+            # Get config file
+            local config_file=$(get_config_file_fallback "bash")
+
+            # Check if already installed
+            if [ "$FORCE_INSTALL" != "true" ] && grep -q "env-loader" "$config_file" 2>/dev/null; then
+                warning "Bash integration already installed in $config_file"
+            else
+                # Add integration
+                cat >> "$config_file" << 'EOF'
+
+# Cross-Shell Environment Loader (Bash/Zsh Compatible)
+# ===================================================
+# Automatically load environment variables from .env files
+if [ -f "$HOME/.local/share/env-loader/bash/loader.sh" ]; then
+    source "$HOME/.local/share/env-loader/bash/loader.sh"
+fi
+EOF
+            fi
+
+            # Validate installation
+            if validate_shell_installation "bash"; then
+                success "Bash integration (bzsh) installed and validated successfully"
+                bash_success=true
+                ((total_success++))
+            else
+                error "Bash installation validation failed, rolling back..."
+                rollback_installation "bash" "$backup_file"
+            fi
+        else
+            error "Failed to copy files for Bash"
+            [ -n "$backup_file" ] && rollback_installation "bash" "$backup_file"
+        fi
+    else
+        warning "Bash is not available on this system"
+    fi
+
+    # Install for Zsh if available
+    if is_shell_available "zsh"; then
+        info "Installing bzsh integration for Zsh..."
+        local backup_file=""
+
+        # Create backup before making changes
+        backup_file=$(create_config_backup "zsh")
+
+        # Copy bzsh files to zsh directory
+        if copy_shell_files "zsh"; then
+            # Get config file
+            local config_file=$(get_config_file_fallback "zsh")
+
+            # Check if already installed
+            if [ "$FORCE_INSTALL" != "true" ] && grep -q "env-loader" "$config_file" 2>/dev/null; then
+                warning "Zsh integration already installed in $config_file"
+            else
+                # Add integration
+                cat >> "$config_file" << 'EOF'
+
+# Cross-Shell Environment Loader (Bash/Zsh Compatible)
+# ===================================================
+# Automatically load environment variables from .env files
+if [[ -f "$HOME/.local/share/env-loader/zsh/loader.zsh" ]]; then
+    source "$HOME/.local/share/env-loader/zsh/loader.zsh"
+fi
+EOF
+            fi
+
+            # Validate installation
+            if validate_shell_installation "zsh"; then
+                success "Zsh integration (bzsh) installed and validated successfully"
+                zsh_success=true
+                ((total_success++))
+            else
+                error "Zsh installation validation failed, rolling back..."
+                rollback_installation "zsh" "$backup_file"
+            fi
+        else
+            error "Failed to copy files for Zsh"
+            [ -n "$backup_file" ] && rollback_installation "zsh" "$backup_file"
+        fi
+    else
+        warning "Zsh is not available on this system"
+    fi
+
+    # Summary
+    if [ $total_success -gt 0 ]; then
+        success "Bzsh integration completed successfully for $total_success shell(s)"
+        return 0
+    else
+        error "Bzsh integration failed for all shells"
+        return 1
+    fi
+}
+
 # Install integration for Fish
 install_fish() {
     info "Installing Fish integration..."
@@ -847,7 +965,7 @@ parse_arguments() {
                 show_usage
                 exit 0
                 ;;
-            bash|zsh|fish|nu|pwsh)
+            bash|zsh|bzsh|fish|nu|pwsh)
                 SHELLS_TO_INSTALL+=("$1")
                 shift
                 ;;

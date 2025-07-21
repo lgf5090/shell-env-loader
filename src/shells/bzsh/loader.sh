@@ -91,9 +91,7 @@ load_env_file() {
     # Get current shell and platform
     shell_type=$(detect_shell)
     platform=$(detect_platform)
-    
-    echo "Loading environment variables from: $(get_relative_path "$file_path")" >&2
-    
+
     # Parse the file
     parsed_vars=$(parse_env_file "$file_path")
     if [ $? -ne 0 ]; then
