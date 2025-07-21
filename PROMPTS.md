@@ -28,6 +28,10 @@ CONFIG_DIR_WIN=%APPDATA%
 
 
 
+powershell测试命令
+```pwsh
+pwsh -NoProfile -NoLogo -File  tests/shells/test_pwsh_comprehensive.ps1
+```
 
 
 
