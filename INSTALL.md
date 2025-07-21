@@ -8,20 +8,20 @@ Cross-shell environment variable management made simple! Install once, use every
 
 ```bash
 # Install for all available shells (recommended)
-curl -fsSL https://raw.githubusercontent.com/your-username/shell-env-loader/main/install-github.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash
 
 # Or install for specific shells
-curl -fsSL https://raw.githubusercontent.com/your-username/shell-env-loader/main/install-github.sh | bash -s -- --shells bash zsh
+curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- bash zsh
 
 # Or install for all shells non-interactively
-curl -fsSL https://raw.githubusercontent.com/your-username/shell-env-loader/main/install-github.sh | bash -s -- --all
+curl -fsSL https://raw.githubusercontent.com/lgf5090/shell-env-loader/main/install.sh | bash -s -- --all
 ```
 
 ### Alternative: Download and Install Manually
 
 ```bash
 # Download the repository
-git clone https://github.com/your-username/shell-env-loader.git
+git clone https://github.com/lgf5090/shell-env-loader.git
 cd shell-env-loader
 
 # Install for all available shells

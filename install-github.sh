@@ -7,8 +7,8 @@
 set -e  # Exit on any error
 
 # GitHub repository configuration
-GITHUB_REPO="https://github.com/your-username/shell-env-loader"
-GITHUB_RAW="https://raw.githubusercontent.com/your-username/shell-env-loader/main"
+GITHUB_REPO="https://github.com/lgf5090/shell-env-loader"
+GITHUB_RAW="https://raw.githubusercontent.com/lgf5090/shell-env-loader/main"
 INSTALL_DIR="$HOME/.local/share/env-loader"
 LOG_FILE="/tmp/env-loader-install.log"
 TEMP_DIR="/tmp/env-loader-install-$$"

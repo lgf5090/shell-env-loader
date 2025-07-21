@@ -12,8 +12,8 @@ INSTALL_DIR="$HOME/.local/share/env-loader"
 LOG_FILE="/tmp/env-loader-install.log"
 
 # GitHub repository configuration
-GITHUB_REPO="https://github.com/your-username/shell-env-loader"
-GITHUB_RAW="https://raw.githubusercontent.com/your-username/shell-env-loader/main"
+GITHUB_REPO="https://github.com/lgf5090/shell-env-loader"
+GITHUB_RAW="https://raw.githubusercontent.com/lgf5090/shell-env-loader/main"
 TEMP_DIR="/tmp/env-loader-install-$$"
 
 # Colors for output
@@ -714,21 +714,24 @@ main() {
     echo "Cross-Shell Environment Loader - Installation Script"
     echo "===================================================="
     echo ""
-    
+
     # Initialize log
     log "Installation started"
-    
+
     # Parse arguments
     parse_arguments "$@"
-    
+
     # Check prerequisites
     check_prerequisites || exit 1
 
     # Download files from GitHub if needed
     if need_download; then
+        info "Detected online installation mode - downloading files from GitHub..."
         download_from_github || exit 1
         # Set up cleanup trap
         trap cleanup_temp_files EXIT
+    else
+        info "Detected local installation mode - using existing files..."
     fi
     
     # Determine shells to install
