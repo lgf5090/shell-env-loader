@@ -136,9 +136,9 @@ def verify_nushell_integration [] {
         return false
     }
     
-    # Test loading the script
+    # Test loading the script (using nu command since source requires compile-time constant)
     try {
-        source $loader_path
+        nu --no-config-file --commands $"source \"($loader_path)\"; print \"Script loaded successfully\""
         print "✅ Loader script loads without errors"
     } catch {
         print "❌ Loader script has errors"
@@ -181,13 +181,18 @@ def test_integration_in_new_session [] {
     
     # Test in a new Nushell session
     let test_script = $'
-        source "($config_file)"
-        if (which "env load" | length) > 0 {
-            print "✅ Integration test passed - functions are available"
-            env platform
-            env shell
+        if ("($config_file)" | path exists) {
+            source "($config_file)"
+            if (which "env load" | length) > 0 {
+                print "✅ Integration test passed - functions are available"
+                env platform
+                env shell
+            } else {
+                print "❌ Integration test failed - functions not available"
+                exit 1
+            }
         } else {
-            print "❌ Integration test failed - functions not available"
+            print "❌ Configuration file not found: ($config_file)"
             exit 1
         }
     '
