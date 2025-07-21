@@ -117,11 +117,13 @@ process_env_value() {
 process_double_quoted_value() {
     local value="$1"
 
-    # Handle escape sequences step by step
-    # First handle backslash-backslash-quote (\\") -> quote (")
-    value=$(echo "$value" | sed 's/\\\\\"/"/g')
-    # Then handle backslash-backslash (\\) -> backslash (\)
-    value=$(echo "$value" | sed 's/\\\\\\\\/\\\\/g')
+    # Ultra-conservative approach: preserve ALL escape sequences
+    # This prevents issues with \U being interpreted as null character in Zsh
+    # and preserves JSON strings, Windows paths, and regex patterns exactly as intended
+
+    # Do NOT process any escape sequences to avoid shell-specific interpretation issues
+    # This ensures maximum compatibility across Bash, Zsh, and other shells
+    # The test suite expects escape sequences to be preserved as-is
 
     echo "$value"
 }
