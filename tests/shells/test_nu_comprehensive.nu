@@ -101,7 +101,7 @@ print "Sourcing loader..."
 source "../../src/shells/nu/loader.nu"
 
 print "Getting environment variables to set..."
-let env_vars_to_set = (get_env_vars_to_set "../../.env.example")
+let env_vars_to_set = (get_env_vars_to_set ".env.example")
 let var_count = ($env_vars_to_set | columns | length)
 print $"Variables to set: ($var_count)"
 
