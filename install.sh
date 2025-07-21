@@ -465,6 +465,9 @@ install_bash() {
     info "Installing Bash integration..."
     local backup_file=""
 
+    # Ensure shell detector is loaded
+    load_shell_detector || return 1
+
     if ! is_shell_available "bash"; then
         warning "Bash is not available on this system"
         return 1
@@ -520,6 +523,9 @@ install_zsh() {
     info "Installing Zsh integration..."
     local backup_file=""
 
+    # Ensure shell detector is loaded
+    load_shell_detector || return 1
+
     if ! is_shell_available "zsh"; then
         warning "Zsh is not available on this system"
         return 1
@@ -574,6 +580,9 @@ EOF
 install_fish() {
     info "Installing Fish integration..."
     local backup_file=""
+
+    # Ensure shell detector is loaded
+    load_shell_detector || return 1
 
     if ! is_shell_available "fish"; then
         warning "Fish is not available on this system"
