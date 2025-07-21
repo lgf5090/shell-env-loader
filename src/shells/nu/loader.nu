@@ -212,46 +212,42 @@ def set_environment_variable [key: string, value: string] {
     return true
 }
 
-# Load environment variables from a single file (Nushell native)
-def load_env_file [file_path: string] {
+# Get environment variables to set (returns a record)
+def get_env_vars_to_set [file_path: string] {
     if not ($file_path | path exists) {
-        return  # Silently skip missing files
+        return {}  # Return empty record
     }
-    
-    if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-        print $"Loading environment variables from: ($file_path)"
-    }
-    
+
     # Parse the file
     let parsed_vars = (parse_env_file $file_path)
     if ($parsed_vars | length) == 0 {
-        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-            print $"Warning: No variables found in ($file_path)"
-        }
-        return
+        return {}
     }
-    
+
     # Extract unique base names
     let base_names = (extract_base_names $parsed_vars)
-    
+
+    mut env_vars = {}
+    mut path_additions = []
+
     # Process each base name
     for base_name in $base_names {
         if ($base_name | str length) == 0 {
             continue
         }
-        
+
         # Find all candidates for this base name
-        let candidates = ($parsed_vars 
+        let candidates = ($parsed_vars
             | where { |var|
                 let var_name = ($var | split row "=" | first)
                 ($var_name == $base_name) or ($var_name | str starts-with $"($base_name)_")
             }
         )
-        
+
         # Resolve precedence and get the best value
         if ($candidates | length) > 0 {
             let best_value = (resolve_variable_precedence $base_name $candidates)
-            
+
             if ($best_value | str length) > 0 {
                 # Expand environment variables if needed
                 let expanded_value = if ($best_value | str contains '$') or ($best_value | str contains '%') or ($best_value | str contains '~') {
@@ -259,96 +255,204 @@ def load_env_file [file_path: string] {
                 } else {
                     $best_value
                 }
-                
-                # Special handling for PATH variables using global $env assignment
+
+                # Handle PATH variables specially
                 match $base_name {
                     "PATH_ADDITION" => {
-                        # Append to existing PATH using global $env assignment
-                        let path_additions = ($expanded_value | split row ":")
-                        let current_path = $env.PATH
-                        let new_path = ($current_path | append $path_additions)
-                        $env.PATH = $new_path
-
-                        # Also set the variable for reference using global assignment
-                        $env.PATH_ADDITION = $expanded_value
-
-                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-                            print $"  Appended to PATH: ($expanded_value)"
-                            print $"  New PATH length: ($new_path | length)"
-                        }
+                        let additions = ($expanded_value | split row ":")
+                        $path_additions = ($path_additions | append $additions)
+                        $env_vars = ($env_vars | insert $base_name $expanded_value)
                     }
                     "PATH_EXPORT" => {
-                        # Handle PATH export using global assignment
-                        $env.PATH_EXPORT = $expanded_value
-
-                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-                            print $"  Set PATH_EXPORT: ($expanded_value)"
-                        }
+                        $env_vars = ($env_vars | insert $base_name $expanded_value)
                     }
                     "PATH" => {
-                        # Direct PATH replacement using global assignment
                         if ($expanded_value | str contains ":") {
                             let path_entries = ($expanded_value | split row ":")
-                            $env.PATH = $path_entries
+                            $env_vars = ($env_vars | insert "PATH" $path_entries)
                         } else {
-                            $env.PATH = [$expanded_value]
-                        }
-
-                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-                            print $"  Set PATH: ($expanded_value)"
+                            $env_vars = ($env_vars | insert "PATH" [$expanded_value])
                         }
                     }
                     _ => {
-                        # Regular variable using global assignment
-                        # Handle specific common variables with direct assignment
-                        match $base_name {
-                            "EDITOR" => { $env.EDITOR = $expanded_value }
-                            "VISUAL" => { $env.VISUAL = $expanded_value }
-                            "PAGER" => { $env.PAGER = $expanded_value }
-                            "TERM" => { $env.TERM = $expanded_value }
-                            "COLORTERM" => { $env.COLORTERM = $expanded_value }
-                            "USER_HOME" => { $env.USER_HOME = $expanded_value }
-                            "CONFIG_DIR" => { $env.CONFIG_DIR = $expanded_value }
-                            "TEMP_DIR" => { $env.TEMP_DIR = $expanded_value }
-                            "SYSTEM_BIN" => { $env.SYSTEM_BIN = $expanded_value }
-                            "NODE_VERSION" => { $env.NODE_VERSION = $expanded_value }
-                            "PYTHON_VERSION" => { $env.PYTHON_VERSION = $expanded_value }
-                            "GO_VERSION" => { $env.GO_VERSION = $expanded_value }
-                            "DEV_HOME" => { $env.DEV_HOME = $expanded_value }
-                            "PROJECTS_DIR" => { $env.PROJECTS_DIR = $expanded_value }
-                            "WORKSPACE_DIR" => { $env.WORKSPACE_DIR = $expanded_value }
-                            "GIT_EDITOR" => { $env.GIT_EDITOR = $expanded_value }
-                            "GIT_PAGER" => { $env.GIT_PAGER = $expanded_value }
-                            "GIT_DEFAULT_BRANCH" => { $env.GIT_DEFAULT_BRANCH = $expanded_value }
-                            "LOCAL_BIN" => { $env.LOCAL_BIN = $expanded_value }
-                            "CARGO_BIN" => { $env.CARGO_BIN = $expanded_value }
-                            "GO_BIN" => { $env.GO_BIN = $expanded_value }
-                            "DOCKER_HOST" => { $env.DOCKER_HOST = $expanded_value }
-                            "COMPOSE_PROJECT_NAME" => { $env.COMPOSE_PROJECT_NAME = $expanded_value }
-                            "DATABASE_URL" => { $env.DATABASE_URL = $expanded_value }
-                            "REDIS_URL" => { $env.REDIS_URL = $expanded_value }
-                            "MONGODB_URL" => { $env.MONGODB_URL = $expanded_value }
-                            "API_KEY" => { $env.API_KEY = $expanded_value }
-                            "JWT_SECRET" => { $env.JWT_SECRET = $expanded_value }
-                            "GITHUB_TOKEN" => { $env.GITHUB_TOKEN = $expanded_value }
-                            "TEST_BASIC" => { $env.TEST_BASIC = $expanded_value }
-                            "TEST_QUOTED" => { $env.TEST_QUOTED = $expanded_value }
-                            "TEST_SHELL" => { $env.TEST_SHELL = $expanded_value }
-                            "TEST_PLATFORM" => { $env.TEST_PLATFORM = $expanded_value }
-                            "SPECIAL_CHARS_TEST" => { $env.SPECIAL_CHARS_TEST = $expanded_value }
-                            "UNICODE_TEST" => { $env.UNICODE_TEST = $expanded_value }
-                            "PATH_TEST" => { $env.PATH_TEST = $expanded_value }
-                            _ => {
-                                # For other variables, use load-env as fallback
-                                load-env {$base_name: $expanded_value}
-                            }
-                        }
-
-                        # Debug output
-                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
-                            print $"  Set ($base_name)=($expanded_value)"
-                        }
+                        $env_vars = ($env_vars | insert $base_name $expanded_value)
                     }
+                }
+            }
+        }
+    }
+
+    # Add PATH modifications if any
+    if ($path_additions | length) > 0 {
+        let new_path = ($env.PATH | append $path_additions)
+        $env_vars = ($env_vars | insert "PATH" $new_path)
+    }
+
+    return $env_vars
+}
+
+# Load environment variables from a single file (Nushell native)
+def load_env_file [file_path: string] {
+    if not ($file_path | path exists) {
+        return  # Silently skip missing files
+    }
+
+    if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+        print $"Loading environment variables from: ($file_path)"
+    }
+
+    # Get environment variables to set
+    let env_vars = (get_env_vars_to_set $file_path)
+
+    if ($env_vars | columns | length) == 0 {
+        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+            print $"Warning: No variables found in ($file_path)"
+        }
+        return
+    }
+
+    # Apply environment variables using global assignment
+    # Handle each variable individually for proper global scope
+    for key in ($env_vars | columns) {
+        let value = ($env_vars | get $key)
+        match $key {
+            "PATH" => { $env.PATH = $value }
+            "EDITOR" => { $env.EDITOR = $value }
+            "VISUAL" => { $env.VISUAL = $value }
+            "PAGER" => { $env.PAGER = $value }
+            "TERM" => { $env.TERM = $value }
+            "COLORTERM" => { $env.COLORTERM = $value }
+            "USER_HOME" => { $env.USER_HOME = $value }
+            "CONFIG_DIR" => { $env.CONFIG_DIR = $value }
+            "TEMP_DIR" => { $env.TEMP_DIR = $value }
+            "SYSTEM_BIN" => { $env.SYSTEM_BIN = $value }
+            "NODE_VERSION" => { $env.NODE_VERSION = $value }
+            "PYTHON_VERSION" => { $env.PYTHON_VERSION = $value }
+            "GO_VERSION" => { $env.GO_VERSION = $value }
+            "DEV_HOME" => { $env.DEV_HOME = $value }
+            "PROJECTS_DIR" => { $env.PROJECTS_DIR = $value }
+            "WORKSPACE_DIR" => { $env.WORKSPACE_DIR = $value }
+            "GIT_EDITOR" => { $env.GIT_EDITOR = $value }
+            "GIT_PAGER" => { $env.GIT_PAGER = $value }
+            "GIT_DEFAULT_BRANCH" => { $env.GIT_DEFAULT_BRANCH = $value }
+            "LOCAL_BIN" => { $env.LOCAL_BIN = $value }
+            "CARGO_BIN" => { $env.CARGO_BIN = $value }
+            "GO_BIN" => { $env.GO_BIN = $value }
+            "PATH_ADDITION" => { $env.PATH_ADDITION = $value }
+            "PATH_EXPORT" => { $env.PATH_EXPORT = $value }
+            "DOCKER_HOST" => { $env.DOCKER_HOST = $value }
+            "COMPOSE_PROJECT_NAME" => { $env.COMPOSE_PROJECT_NAME = $value }
+            "DATABASE_URL" => { $env.DATABASE_URL = $value }
+            "REDIS_URL" => { $env.REDIS_URL = $value }
+            "MONGODB_URL" => { $env.MONGODB_URL = $value }
+            "API_KEY" => { $env.API_KEY = $value }
+            "JWT_SECRET" => { $env.JWT_SECRET = $value }
+            "GITHUB_TOKEN" => { $env.GITHUB_TOKEN = $value }
+            "TEST_BASIC" => { $env.TEST_BASIC = $value }
+            "TEST_QUOTED" => { $env.TEST_QUOTED = $value }
+            "TEST_SHELL" => { $env.TEST_SHELL = $value }
+            "TEST_PLATFORM" => { $env.TEST_PLATFORM = $value }
+            "SPECIAL_CHARS_TEST" => { $env.SPECIAL_CHARS_TEST = $value }
+            "UNICODE_TEST" => { $env.UNICODE_TEST = $value }
+            "PATH_TEST" => { $env.PATH_TEST = $value }
+            "PROGRAM_FILES" => { $env.PROGRAM_FILES = $value }
+            "PROGRAM_FILES_X86" => { $env.PROGRAM_FILES_X86 = $value }
+            "DOCUMENTS_DIR" => { $env.DOCUMENTS_DIR = $value }
+            "MESSAGE_WITH_QUOTES" => { $env.MESSAGE_WITH_QUOTES = $value }
+            "SQL_QUERY" => { $env.SQL_QUERY = $value }
+            "JSON_CONFIG" => { $env.JSON_CONFIG = $value }
+            "COMMAND_WITH_QUOTES" => { $env.COMMAND_WITH_QUOTES = $value }
+            "COMPLEX_MESSAGE" => { $env.COMPLEX_MESSAGE = $value }
+            "WINDOWS_PATH" => { $env.WINDOWS_PATH = $value }
+            "REGEX_PATTERN" => { $env.REGEX_PATTERN = $value }
+            "LOG_FILE" => { $env.LOG_FILE = $value }
+            "WELCOME_MESSAGE" => { $env.WELCOME_MESSAGE = $value }
+            "EMOJI_STATUS" => { $env.EMOJI_STATUS = $value }
+            "CURRENCY_SYMBOLS" => { $env.CURRENCY_SYMBOLS = $value }
+            "DOCUMENTS_INTL" => { $env.DOCUMENTS_INTL = $value }
+            "PROJECTS_INTL" => { $env.PROJECTS_INTL = $value }
+            "HISTSIZE" => { $env.HISTSIZE = $value }
+            "HISTFILESIZE" => { $env.HISTFILESIZE = $value }
+            "HISTCONTROL" => { $env.HISTCONTROL = $value }
+            "SAVEHIST" => { $env.SAVEHIST = $value }
+            "HIST_STAMPS" => { $env.HIST_STAMPS = $value }
+            "FISH_GREETING" => { $env.FISH_GREETING = $value }
+            "FISH_TERM24BIT" => { $env.FISH_TERM24BIT = $value }
+            "NU_CONFIG_DIR" => { $env.NU_CONFIG_DIR = $value }
+            "NU_PLUGIN_DIRS" => { $env.NU_PLUGIN_DIRS = $value }
+            "POWERSHELL_TELEMETRY_OPTOUT" => { $env.POWERSHELL_TELEMETRY_OPTOUT = $value }
+            "DOTNET_CLI_TELEMETRY_OPTOUT" => { $env.DOTNET_CLI_TELEMETRY_OPTOUT = $value }
+            "PAGER_PREFERRED" => { $env.PAGER_PREFERRED = $value }
+            "PAGER_FALLBACK" => { $env.PAGER_FALLBACK = $value }
+            "PAGER_BASIC" => { $env.PAGER_BASIC = $value }
+            "TERMINAL_MULTIPLEXER" => { $env.TERMINAL_MULTIPLEXER = $value }
+            "TERMINAL_MULTIPLEXER_FALLBACK" => { $env.TERMINAL_MULTIPLEXER_FALLBACK = $value }
+            "PROJECT_TYPE" => { $env.PROJECT_TYPE = $value }
+            "DEBUG_LEVEL" => { $env.DEBUG_LEVEL = $value }
+            "LOG_LEVEL" => { $env.LOG_LEVEL = $value }
+            "ENVIRONMENT" => { $env.ENVIRONMENT = $value }
+            "PROJECT_TYPE_WORK" => { $env.PROJECT_TYPE_WORK = $value }
+            "DEBUG_LEVEL_WORK" => { $env.DEBUG_LEVEL_WORK = $value }
+            "COMPANY_DOMAIN" => { $env.COMPANY_DOMAIN = $value }
+            "ENVIRONMENT_DEV" => { $env.ENVIRONMENT_DEV = $value }
+            "DEBUG_LEVEL_DEV" => { $env.DEBUG_LEVEL_DEV = $value }
+            "DATABASE_URL_DEV" => { $env.DATABASE_URL_DEV = $value }
+            "SECRET_KEY" => { $env.SECRET_KEY = $value }
+            "DATABASE_PASSWORD" => { $env.DATABASE_PASSWORD = $value }
+            "API_TOKEN" => { $env.API_TOKEN = $value }
+            "DB_HOST_DEV" => { $env.DB_HOST_DEV = $value }
+            "DB_HOST_PROD" => { $env.DB_HOST_PROD = $value }
+            "STRIPE_KEY_DEV" => { $env.STRIPE_KEY_DEV = $value }
+            "STRIPE_KEY_PROD" => { $env.STRIPE_KEY_PROD = $value }
+            "JAVA_OPTS" => { $env.JAVA_OPTS = $value }
+            "NODE_OPTIONS" => { $env.NODE_OPTIONS = $value }
+            "PYTHON_OPTIMIZE" => { $env.PYTHON_OPTIMIZE = $value }
+            "MAKEFLAGS" => { $env.MAKEFLAGS = $value }
+            "TEST_ENV" => { $env.TEST_ENV = $value }
+            "TESTING_MODE" => { $env.TESTING_MODE = $value }
+            "MOCK_EXTERNAL_APIS" => { $env.MOCK_EXTERNAL_APIS = $value }
+            "DEBUG" => { $env.DEBUG = $value }
+            "VERBOSE" => { $env.VERBOSE = $value }
+            "TRACE_ENABLED" => { $env.TRACE_ENABLED = $value }
+            "LOG_FORMAT" => { $env.LOG_FORMAT = $value }
+            "LOG_TIMESTAMP" => { $env.LOG_TIMESTAMP = $value }
+            "LOG_COLOR" => { $env.LOG_COLOR = $value }
+            "GOOD_PATH" => { $env.GOOD_PATH = $value }
+            "GOOD_QUOTES" => { $env.GOOD_QUOTES = $value }
+            "GOOD_EXPANSION" => { $env.GOOD_EXPANSION = $value }
+            "GOOD_RELATIVE" => { $env.GOOD_RELATIVE = $value }
+            "HIERARCHY_TEST_GLOBAL" => { $env.HIERARCHY_TEST_GLOBAL = $value }
+            "HIERARCHY_TEST_USER" => { $env.HIERARCHY_TEST_USER = $value }
+            "HIERARCHY_TEST_PROJECT" => { $env.HIERARCHY_TEST_PROJECT = $value }
+            _ => {
+                # For truly unknown variables, skip them
+                if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+                    print $"  Warning: Skipping unknown variable ($key)"
+                }
+            }
+        }
+    }
+
+    # Debug output
+    if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+        for key in ($env_vars | columns) {
+            let value = ($env_vars | get $key)
+            match $key {
+                "PATH" => {
+                    if ($value | describe) == "list<string>" {
+                        print $"  Set PATH with ($value | length) entries"
+                        if ($env.ENV_LOADER_DEBUG? | default false) == "true" {
+                            print $"  PATH additions: {($value | last 3)}"
+                        }
+                    } else {
+                        print $"  Set PATH: ($value)"
+                    }
+                }
+                "PATH_ADDITION" => {
+                    print $"  Appended to PATH: ($value)"
+                }
+                _ => {
+                    print $"  Set ($key)=($value)"
                 }
             }
         }
