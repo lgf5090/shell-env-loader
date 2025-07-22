@@ -30,6 +30,11 @@ safe_expand_vars() {
         *'$('*|*'`'*) echo "$value"; return ;;
     esac
 
+    # First handle tilde expansion (doesn't require $ symbol)
+    case "$value" in
+        *'~'*) value="${value//\~/$HOME}" ;;
+    esac
+
     # Iterative variable expansion for compatibility
     while [[ "$value" == *'$'* ]] && ((depth < max_depth)); do
         local found_var=false
@@ -37,9 +42,6 @@ safe_expand_vars() {
         # Expand common variables using parameter expansion
         case "$value" in
             *'$HOME'*) value="${value//\$HOME/$HOME}"; found_var=true ;;
-        esac
-        case "$value" in
-            *'~'*) value="${value//\~/$HOME}"; found_var=true ;;
         esac
         case "$value" in
             *'$USER'*) value="${value//\$USER/$USER}"; found_var=true ;;
