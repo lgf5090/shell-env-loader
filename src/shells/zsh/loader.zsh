@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # Ultra High-Performance ZSH Environment Variable Loader
-# ===============================================
-# ZSH-specific optimized implementation using native ZSH features
+# ======================================================
+# Self-contained ZSH loader with zero external dependencies
 
 # Enable ZSH options for maximum performance
 setopt EXTENDED_GLOB
@@ -10,23 +10,34 @@ setopt NO_NOMATCH
 setopt LOCAL_OPTIONS
 setopt LOCAL_TRAPS
 
-# Get script directory using ZSH-specific method
-SCRIPT_DIR="${${(%):-%x}:A:h}"
-
-# Source common utilities
-COMMON_DIR="$SCRIPT_DIR/../common"
-. "$COMMON_DIR/platform.sh"
-. "$COMMON_DIR/hierarchy.sh"
+# Detect platform without external commands
+detect_platform_fast() {
+    case "$(uname -s)" in
+        Linux*)
+            if [[ -n "${WSL_DISTRO_NAME:-}" || -n "${WSLENV:-}" ]]; then
+                echo "WSL"
+            else
+                echo "LINUX"
+            fi
+            ;;
+        Darwin*) echo "MACOS" ;;
+        CYGWIN*|MINGW*|MSYS*) echo "WIN" ;;
+        *) echo "UNKNOWN" ;;
+    esac
+}
 
 # Ultra-fast ZSH environment file loading using native ZSH features
-# Usage: load_env_file <file_path>
+# Usage: load_env_file <file_path> [silent]
 load_env_file() {
     local env_file="$1"
+    local silent="${2:-false}"
 
     [[ ! -f "$env_file" ]] && return 0
 
+    [[ "$silent" != "true" ]] && print "Loading environment variables from: $env_file"
+
     # Get platform info once (ZSH caching)
-    local platform=${_ENV_PLATFORM:-$(detect_platform)}
+    local platform=${_ENV_PLATFORM:-$(detect_platform_fast)}
     _ENV_PLATFORM="$platform"
 
     # ZSH associative arrays for best candidates (much faster than repeated lookups)
@@ -135,36 +146,52 @@ load_env_file() {
 
 # Ultra-fast ZSH environment variables loading using native arrays
 load_env_variables() {
+    local silent="${1:-false}"
     local -a files_to_load
     local loaded_count=0
 
-    if (( $# > 0 )); then
-        # Use provided files
-        files_to_load=("$@")
+    if (( $# > 1 )); then
+        # Use provided files (skip first argument which is silent flag)
+        files_to_load=("${@[2,-1]}")
     else
-        # Get hierarchy and convert to array efficiently
-        local files_string=$(get_env_file_hierarchy)
-        files_to_load=("${(@f)files_string}")
+        # Simple file hierarchy without external commands
+        local -a temp_files
+
+        # Global user settings
+        [[ -f "$HOME/.env" ]] && temp_files+=("$HOME/.env")
+
+        # User configuration directory
+        [[ -f "$HOME/.cfgs/.env" ]] && temp_files+=("$HOME/.cfgs/.env")
+
+        # Project-specific settings
+        [[ -f "$PWD/.env" ]] && temp_files+=("$PWD/.env")
+
+        files_to_load=("${temp_files[@]}")
     fi
 
     # Process files using ZSH's efficient array iteration
     local file
     for file in "${files_to_load[@]}"; do
         if [[ -n "$file" && -f "$file" ]]; then
-            load_env_file "$file"
+            load_env_file "$file" "$silent"
             (( loaded_count++ ))
         fi
     done
 
-    [[ "${ENV_LOADER_DEBUG:-}" == "true" ]] && print -r "Loaded environment variables from $loaded_count files" >&2
+    [[ "$silent" != "true" ]] && print -r "Loaded environment variables from $loaded_count files"
 
     return 0
 }
 
 # Fast ZSH initialization
 init_env_loader() {
-    ensure_env_directories
-    load_env_variables
+    local silent="${1:-false}"
+
+    # Fast directory creation
+    [[ ! -d "$HOME/.cfgs" ]] && mkdir -p "$HOME/.cfgs" 2>/dev/null
+
+    # Load environment variables
+    load_env_variables "$silent"
 }
 
 # ZSH-specific sourcing detection (much faster than generic method)
@@ -175,5 +202,5 @@ is_sourced() {
 # Auto-initialize with ZSH-specific optimization
 if is_sourced && [[ -z "${ENV_LOADER_INITIALIZED:-}" ]]; then
     export ENV_LOADER_INITIALIZED=true
-    init_env_loader
+    init_env_loader true  # Silent mode for auto-initialization
 fi
