@@ -22,13 +22,87 @@ detect_platform_fast() {
 # Safe variable expansion without external commands
 safe_expand_vars() {
     local value="$1"
-    
-    # Expand common variables using parameter expansion
-    value="${value//\$HOME/$HOME}"
-    value="${value//\~/$HOME}"
-    value="${value//\$USER/$USER}"
-    value="${value//\$PWD/$PWD}"
-    
+    local max_depth=10
+    local depth=0
+
+    # First, check for command injection attempts and treat them as literal strings
+    case "$value" in
+        *'$('*|*'`'*) echo "$value"; return ;;
+    esac
+
+    # Iterative variable expansion for compatibility
+    while [[ "$value" == *'$'* ]] && ((depth < max_depth)); do
+        local found_var=false
+
+        # Expand common variables using parameter expansion
+        case "$value" in
+            *'$HOME'*) value="${value//\$HOME/$HOME}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'~'*) value="${value//\~/$HOME}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'$USER'*) value="${value//\$USER/$USER}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'$PWD'*) value="${value//\$PWD/$PWD}"; found_var=true ;;
+        esac
+
+        # Expand other environment variables that are already set
+        local common_vars="GOPATH GOROOT NODE_ENV PYTHONPATH JAVA_HOME MAVEN_HOME CARGO_HOME RUSTUP_HOME"
+        for var in $common_vars; do
+            case "$value" in
+                *"\$$var"*)
+                    local var_value=""
+                    eval "var_value=\$$var"
+                    if [ -n "$var_value" ]; then
+                        value="${value//\$$var/$var_value}"
+                        found_var=true
+                    fi
+                    ;;
+            esac
+        done
+
+        # Expand any other variables that are already set (for PATH_ADDITION variables)
+        # Extract variable names from $VAR patterns
+        local temp_value="$value"
+        while [[ "$temp_value" == *'$'* ]]; do
+            # Find the next $VAR pattern
+            local before="${temp_value%%\$*}"
+            local after="${temp_value#*\$}"
+            if [ "$after" != "$temp_value" ]; then
+                # Extract variable name (alphanumeric and underscore only)
+                local var_name=""
+                local i=0
+                while [ $i -lt ${#after} ]; do
+                    local char="${after:$i:1}"
+                    case "$char" in
+                        [A-Za-z0-9_]) var_name="$var_name$char" ;;
+                        *) break ;;
+                    esac
+                    i=$((i + 1))
+                done
+
+                if [ -n "$var_name" ]; then
+                    local var_value=""
+                    eval "var_value=\$$var_name"
+                    if [ -n "$var_value" ]; then
+                        value="${value//\$$var_name/$var_value}"
+                        found_var=true
+                    fi
+                fi
+
+                # Move past this variable for next iteration
+                temp_value="${after#$var_name}"
+            else
+                break
+            fi
+        done
+
+        [ "$found_var" = false ] && break
+        depth=$((depth + 1))
+    done
+
     echo "$value"
 }
 
