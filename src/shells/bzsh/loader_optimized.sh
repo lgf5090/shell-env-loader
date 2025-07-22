@@ -1,72 +1,55 @@
 #!/bin/bash
 # Ultra High-Performance Bash/Zsh Compatible Environment Variable Loader
 # ======================================================================
-# Based on ref/load_env.sh with minimal external commands and shell-specific optimizations
+# Optimized based on ref/load_env.sh approach with minimal external commands
 
-# Detect platform without external commands
-detect_platform_fast() {
-    case "$(uname -s)" in
-        Linux*)
-            if [ -n "${WSL_DISTRO_NAME:-}" ] || [ -n "${WSLENV:-}" ]; then
-                echo "WSL"
-            else
-                echo "LINUX"
-            fi
-            ;;
-        Darwin*) echo "MACOS" ;;
-        CYGWIN*|MINGW*|MSYS*) echo "WIN" ;;
-        *) echo "UNKNOWN" ;;
-    esac
-}
+# Get the directory of this script (compatible with both bash and zsh)
+if [ -n "${BASH_SOURCE[0]}" ]; then
+    # Bash
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [ -n "${(%):-%x}" ]; then
+    # Zsh - use safer method for sourced scripts
+    local script_path="${(%):-%x}"
+    SCRIPT_DIR="${script_path:A:h}"
+else
+    # Fallback
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 
-# Safe variable expansion without external commands
-safe_expand_vars() {
-    local value="$1"
-    
-    # Expand common variables using parameter expansion
-    value="${value//\$HOME/$HOME}"
-    value="${value//\~/$HOME}"
-    value="${value//\$USER/$USER}"
-    value="${value//\$PWD/$PWD}"
-    
-    echo "$value"
-}
+# Source common utilities (adjust path for installation location)
+COMMON_DIR="$SCRIPT_DIR/../common"
+. "$COMMON_DIR/platform.sh"
+. "$COMMON_DIR/hierarchy.sh"
 
-# Ultra-fast environment file loading
+# Ultra-fast environment file loading using minimal external commands
+# Usage: load_env_file <file_path>
 load_env_file() {
     local env_file="$1"
-    local silent="${2:-false}"
     
     [ ! -f "$env_file" ] && return 0
     
-    [ "$silent" != "true" ] && echo "Loading environment variables from: $env_file"
-    
     # Get platform once for efficiency
-    local platform=$(detect_platform_fast)
+    local platform=$(detect_platform)
     
     # Read file line by line
     while IFS= read -r line || [ -n "$line" ]; do
-        # Skip empty lines and comments using pattern matching (faster than regex)
+        # Skip empty lines and comments using pattern matching
         [ -z "$line" ] && continue
         case "$line" in
             \#*) continue ;;
         esac
         
-        # Remove leading/trailing whitespace using parameter expansion
-        line="${line#"${line%%[![:space:]]*}"}"
-        line="${line%"${line##*[![:space:]]}"}"
-        
-        # Skip if line doesn't contain '='
+        # Skip lines without '=' using pattern matching
         case "$line" in
             *=*) ;;
             *) continue ;;
         esac
         
-        # Extract key and value using parameter expansion (much faster than cut)
+        # Extract key and value using shell parameter expansion (MUCH faster)
         local key="${line%%=*}"
         local value="${line#*=}"
         
-        # Trim whitespace from key and value
+        # Trim whitespace using parameter expansion
         key="${key#"${key%%[![:space:]]*}"}"
         key="${key%"${key##*[![:space:]]}"}"
         value="${value#"${value%%[![:space:]]*}"}"
@@ -87,7 +70,7 @@ load_env_file() {
             \'*\') value="${value#\'}" ; value="${value%\'}" ;;
         esac
         
-        # Handle shell and platform-specific variables with optimized logic
+        # Handle platform and shell-specific variables with optimized logic
         local should_export=false
         local export_key="$key"
         
@@ -155,10 +138,18 @@ load_env_file() {
         esac
         
         if [ "$should_export" = true ]; then
-            # Expand variables in value
-            value=$(safe_expand_vars "$value")
+            # Fast variable expansion for common cases using parameter expansion
+            case "$value" in
+                *'$HOME'*) value="${value//\$HOME/$HOME}" ;;
+            esac
+            case "$value" in
+                *'$USER'*) value="${value//\$USER/$USER}" ;;
+            esac
+            case "$value" in
+                *'~'*) value="${value//\~/$HOME}" ;;
+            esac
             
-            # Handle PATH additions
+            # Handle PATH additions efficiently
             case "$export_key" in
                 PATH_ADDITION|PATH_ADDITIONS)
                     if [ -n "$value" ]; then
@@ -166,12 +157,12 @@ load_env_file() {
                             *":$value:"*) ;;
                             *) export PATH="$value:$PATH" ;;
                         esac
-                        [ "$silent" != "true" ] && echo "  Added to PATH: $value"
+                        [ "${ENV_LOADER_DEBUG:-}" = "true" ] && echo "  Added to PATH: $value" >&2
                     fi
                     ;;
                 *)
                     export "$export_key"="$value"
-                    [ "$silent" != "true" ] && echo "  Set $export_key=$value"
+                    [ "${ENV_LOADER_DEBUG:-}" = "true" ] && echo "  Set $export_key=$value" >&2
                     ;;
             esac
         fi
@@ -179,45 +170,38 @@ load_env_file() {
     done < "$env_file"
 }
 
-# Fast environment variables loading with minimal file system operations
+# Load environment variables from all files in hierarchy
 load_env_variables() {
-    local silent="${1:-false}"
+    local files
+    local file
     local loaded_count=0
     
-    # Simple file hierarchy without external commands
-    local files=""
-    
-    # Global user settings
-    [ -f "$HOME/.env" ] && files="$files$HOME/.env "
-    
-    # User configuration directory  
-    [ -f "$HOME/.cfgs/.env" ] && files="$files$HOME/.cfgs/.env "
-    
-    # Project-specific settings
-    [ -f "$PWD/.env" ] && files="$files$PWD/.env "
+    if [ $# -gt 0 ]; then
+        files="$*"
+    else
+        files=$(get_env_file_hierarchy)
+    fi
     
     # Process files efficiently
     for file in $files; do
         if [ -n "$file" ] && [ -f "$file" ]; then
-            load_env_file "$file" "$silent"
+            load_env_file "$file"
             loaded_count=$((loaded_count + 1))
         fi
     done
     
-    [ "$silent" != "true" ] && echo "Loaded environment variables from $loaded_count files"
+    [ "${ENV_LOADER_DEBUG:-}" = "true" ] && echo "Loaded environment variables from $loaded_count files" >&2
     
     return 0
 }
 
-# Fast initialization
+# Initialize the environment loader
 init_env_loader() {
-    local silent="${1:-false}"
-    
-    # Fast directory creation
-    [ ! -d "$HOME/.cfgs" ] && mkdir -p "$HOME/.cfgs" 2>/dev/null
+    # Ensure required directories exist
+    ensure_env_directories
     
     # Load environment variables
-    load_env_variables "$silent"
+    load_env_variables
 }
 
 # Auto-initialize if this script is sourced
@@ -228,7 +212,7 @@ is_sourced() {
         [ "${(%):-%x}" != "${(%):-%N}" ]
     else
         case "$0" in
-            *loader*.sh) return 1 ;;
+            *loader.sh) return 1 ;;
             *) return 0 ;;
         esac
     fi
@@ -236,5 +220,5 @@ is_sourced() {
 
 if is_sourced && [ -z "${ENV_LOADER_INITIALIZED:-}" ]; then
     export ENV_LOADER_INITIALIZED=true
-    init_env_loader true  # Silent mode for auto-initialization
+    init_env_loader
 fi
