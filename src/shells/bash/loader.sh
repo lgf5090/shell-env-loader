@@ -1,46 +1,122 @@
 #!/bin/bash
-# Simple High-Performance Bash/Zsh Compatible Environment Variable Loader
-# ===============================================
-# Optimized implementation based on ref/load_env.sh approach
+# Ultra High-Performance Bash Environment Variable Loader
+# =======================================================
+# Optimized for maximum speed with zero external commands
 
-# Get the directory of this script (compatible with both bash and zsh)
-if [ -n "${BASH_SOURCE[0]}" ]; then
-    # Bash
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-elif [ -n "${(%):-%x}" ]; then
-    # Zsh - use safer method for sourced scripts
-    local script_path="${(%):-%x}"
-    SCRIPT_DIR="${script_path:A:h}"
-else
-    # Fallback
-    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-fi
+# Detect platform without external commands
+detect_platform_fast() {
+    case "$(uname -s)" in
+        Linux*)
+            if [ -n "${WSL_DISTRO_NAME:-}" ] || [ -n "${WSLENV:-}" ]; then
+                echo "WSL"
+            else
+                echo "LINUX"
+            fi
+            ;;
+        Darwin*) echo "MACOS" ;;
+        CYGWIN*|MINGW*|MSYS*) echo "WIN" ;;
+        *) echo "UNKNOWN" ;;
+    esac
+}
 
-# Source common utilities (adjust path for installation location)
-COMMON_DIR="$SCRIPT_DIR/../common"
-. "$COMMON_DIR/platform.sh"
-. "$COMMON_DIR/hierarchy.sh"
+# Safe variable expansion without external commands
+safe_expand_vars() {
+    local value="$1"
+    local max_depth=10
+    local depth=0
 
-# Simple environment file loading (bash/zsh compatible)
-# Usage: load_env_file <file_path>
+    # First, check for command injection attempts and treat them as literal strings
+    case "$value" in
+        *'$('*|*'`'*) echo "$value"; return ;;
+    esac
+
+    # Iterative variable expansion for compatibility
+    while [[ "$value" == *'$'* ]] && ((depth < max_depth)); do
+        local found_var=false
+
+        # Expand common variables using parameter expansion
+        case "$value" in
+            *'$HOME'*) value="${value//\$HOME/$HOME}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'~'*) value="${value//\~/$HOME}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'$USER'*) value="${value//\$USER/$USER}"; found_var=true ;;
+        esac
+        case "$value" in
+            *'$PWD'*) value="${value//\$PWD/$PWD}"; found_var=true ;;
+        esac
+
+        # Expand other environment variables that are already set
+        local common_vars="GOPATH GOROOT NODE_ENV PYTHONPATH JAVA_HOME MAVEN_HOME CARGO_HOME RUSTUP_HOME"
+        for var in $common_vars; do
+            case "$value" in
+                *"\$$var"*)
+                    local var_value=""
+                    eval "var_value=\$$var"
+                    if [ -n "$var_value" ]; then
+                        value="${value//\$$var/$var_value}"
+                        found_var=true
+                    fi
+                    ;;
+            esac
+        done
+
+        # Expand any other variables that are already set (for PATH_ADDITION variables)
+        # Extract variable names from $VAR patterns
+        local temp_value="$value"
+        while [[ "$temp_value" == *'$'* ]]; do
+            # Find the next $VAR pattern
+            local before="${temp_value%%\$*}"
+            local after="${temp_value#*\$}"
+            if [ "$after" != "$temp_value" ]; then
+                # Extract variable name (alphanumeric and underscore only)
+                local var_name=""
+                local i=0
+                while [ $i -lt ${#after} ]; do
+                    local char="${after:$i:1}"
+                    case "$char" in
+                        [A-Za-z0-9_]) var_name="$var_name$char" ;;
+                        *) break ;;
+                    esac
+                    i=$((i + 1))
+                done
+
+                if [ -n "$var_name" ]; then
+                    local var_value=""
+                    eval "var_value=\$$var_name"
+                    if [ -n "$var_value" ]; then
+                        value="${value//\$$var_name/$var_value}"
+                        found_var=true
+                    fi
+                fi
+
+                # Move past this variable for next iteration
+                temp_value="${after#$var_name}"
+            else
+                break
+            fi
+        done
+
+        [ "$found_var" = false ] && break
+        depth=$((depth + 1))
+    done
+
+    echo "$value"
+}
+
+# Ultra-fast environment file loading
 load_env_file() {
     local env_file="$1"
-    
+    local silent="${2:-false}"
+
     [ ! -f "$env_file" ] && return 0
-    
-    # Get shell and platform info
-    local shell_suffix=""
-    local platform_suffix=""
-    
-    # Detect shell
-    if [ -n "$BASH_VERSION" ]; then
-        shell_suffix="_BASH"
-    elif [ -n "$ZSH_VERSION" ]; then
-        shell_suffix="_ZSH"
-    fi
-    
-    # Detect platform
-    local platform=$(detect_platform)
+
+    [ "$silent" != "true" ] && echo "Loading environment variables from: $env_file"
+
+    # Get platform once for efficiency
+    local platform=$(detect_platform_fast)
     case "$platform" in
         LINUX) platform_suffix="_LINUX" ;;
         MACOS) platform_suffix="_MACOS" ;;
@@ -61,37 +137,49 @@ load_env_file() {
             *) continue ;;
         esac
         
-        # Extract key and value
-        local key=$(echo "$line" | cut -d'=' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        local value=$(echo "$line" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        # Extract key and value using parameter expansion (much faster than cut)
+        local key="${line%%=*}"
+        local value="${line#*=}"
+
+        # Trim whitespace from key and value
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
         
-        # Validate key name
+        # Validate key name using pattern matching
+        case "$key" in
+            [A-Za-z_]*) ;;
+            *) continue ;;
+        esac
         case "$key" in
             *[!A-Za-z0-9_]*) continue ;;
-            [0-9]*) continue ;;
         esac
-        
-        # Remove quotes if present
+
+        # Remove quotes using parameter expansion (much faster than sed)
         case "$value" in
-            \"*\") value=$(echo "$value" | sed 's/^"//;s/"$//') ;;
-            \'*\') value=$(echo "$value" | sed "s/^'//;s/'$//") ;;
+            \"*\") value="${value#\"}" ; value="${value%\"}" ;;
+            \'*\') value="${value#\'}" ; value="${value%\'}" ;;
         esac
         
         # Determine if we should export this variable
         local should_export=false
         local export_key="$key"
         
-        # Handle shell-specific variables (highest priority)
+        # Handle shell and platform-specific variables with optimized logic
+        local should_export=false
+        local export_key="$key"
+
         case "$key" in
             *_BASH)
                 if [ -n "$BASH_VERSION" ]; then
-                    export_key=$(echo "$key" | sed 's/_BASH$//')
+                    export_key="${key%_BASH}"
                     should_export=true
                 fi
                 ;;
             *_ZSH)
                 if [ -n "$ZSH_VERSION" ]; then
-                    export_key=$(echo "$key" | sed 's/_ZSH$//')
+                    export_key="${key%_ZSH}"
                     should_export=true
                 fi
                 ;;
@@ -100,55 +188,55 @@ load_env_file() {
                 continue
                 ;;
             *_WSL)
-                if [ "$platform" = "WSL" ] || [ "$platform" = "LINUX" ]; then
-                    export_key=$(echo "$key" | sed 's/_WSL$//')
-                    should_export=true
-                fi
+                case "$platform" in
+                    WSL|LINUX)
+                        export_key="${key%_WSL}"
+                        should_export=true
+                        ;;
+                esac
                 ;;
             *_LINUX)
-                if [ "$platform" = "LINUX" ] || [ "$platform" = "WSL" ]; then
-                    export_key=$(echo "$key" | sed 's/_LINUX$//')
-                    should_export=true
-                fi
+                case "$platform" in
+                    LINUX|WSL)
+                        export_key="${key%_LINUX}"
+                        should_export=true
+                        ;;
+                esac
                 ;;
             *_MACOS)
-                if [ "$platform" = "MACOS" ]; then
-                    export_key=$(echo "$key" | sed 's/_MACOS$//')
-                    should_export=true
-                fi
+                case "$platform" in
+                    MACOS)
+                        export_key="${key%_MACOS}"
+                        should_export=true
+                        ;;
+                esac
                 ;;
             *_UNIX)
                 case "$platform" in
-                    LINUX|WSL|MACOS) 
-                        export_key=$(echo "$key" | sed 's/_UNIX$//')
+                    LINUX|WSL|MACOS)
+                        export_key="${key%_UNIX}"
                         should_export=true
                         ;;
                 esac
                 ;;
             *_WIN|*_WINDOWS)
-                if [ "$platform" = "WIN" ]; then
-                    export_key=$(echo "$key" | sed 's/_WIN\(DOWS\)\?$//')
-                    should_export=true
-                fi
+                case "$platform" in
+                    WIN)
+                        export_key="${key%_WIN*}"
+                        should_export=true
+                        ;;
+                esac
                 ;;
             *)
-                # Regular variable - export if no shell/platform specific version exists
+                # Regular variable - always export
                 should_export=true
                 ;;
         esac
         
         if [ "$should_export" = true ]; then
-            # Simple variable expansion for common cases
-            case "$value" in
-                *'$HOME'*) value=$(echo "$value" | sed "s|\$HOME|$HOME|g") ;;
-            esac
-            case "$value" in
-                *'$USER'*) value=$(echo "$value" | sed "s|\$USER|$USER|g") ;;
-            esac
-            case "$value" in
-                *'~'*) value=$(echo "$value" | sed "s|~|$HOME|g") ;;
-            esac
-            
+            # Expand variables in value
+            value=$(safe_expand_vars "$value")
+
             # Handle PATH additions
             case "$export_key" in
                 PATH_ADDITION|PATH_ADDITIONS)
@@ -157,12 +245,12 @@ load_env_file() {
                             *":$value:"*) ;;
                             *) export PATH="$value:$PATH" ;;
                         esac
-                        [ "${ENV_LOADER_DEBUG:-}" = "true" ] && echo "  Added to PATH: $value" >&2
+                        [ "$silent" != "true" ] && echo "  Added to PATH: $value"
                     fi
                     ;;
                 *)
                     export "$export_key"="$value"
-                    [ "${ENV_LOADER_DEBUG:-}" = "true" ] && echo "  Set $export_key=$value" >&2
+                    [ "$silent" != "true" ] && echo "  Set $export_key=$value"
                     ;;
             esac
         fi
@@ -170,57 +258,45 @@ load_env_file() {
     done < "$env_file"
 }
 
-# Load environment variables from all files in hierarchy
+# Fast environment variables loading with minimal file system operations
 load_env_variables() {
-    local files
-    local file
+    local silent="${1:-false}"
     local loaded_count=0
-    
-    if [ $# -gt 0 ]; then
-        files="$*"
-    else
-        files=$(get_env_file_hierarchy)
-    fi
-    
-    # Process files (handle ZSH differently)
-    if [ -n "$ZSH_VERSION" ]; then
-        # ZSH-specific handling
-        setopt SH_WORD_SPLIT 2>/dev/null || true
-        local IFS_OLD="$IFS"
-        IFS=$'\n'
-        local -a files_array
-        files_array=(${(f)files})
-        for file in "${files_array[@]}"; do
-            if [ -n "$file" ] && [ -f "$file" ]; then
-                load_env_file "$file"
-                loaded_count=$((loaded_count + 1))
-            fi
-        done
-        IFS="$IFS_OLD"
-    else
-        # BASH handling
-        for file in $files; do
-            if [ -n "$file" ] && [ -f "$file" ]; then
-                load_env_file "$file"
-                loaded_count=$((loaded_count + 1))
-            fi
-        done
-    fi
-    
-    if [ "${ENV_LOADER_DEBUG:-}" = "true" ]; then
-        echo "Loaded environment variables from $loaded_count files" >&2
-    fi
-    
+
+    # Simple file hierarchy without external commands
+    local files=""
+
+    # Global user settings
+    [ -f "$HOME/.env" ] && files="$files$HOME/.env "
+
+    # User configuration directory
+    [ -f "$HOME/.cfgs/.env" ] && files="$files$HOME/.cfgs/.env "
+
+    # Project-specific settings
+    [ -f "$PWD/.env" ] && files="$files$PWD/.env "
+
+    # Process files efficiently
+    for file in $files; do
+        if [ -n "$file" ] && [ -f "$file" ]; then
+            load_env_file "$file" "$silent"
+            loaded_count=$((loaded_count + 1))
+        fi
+    done
+
+    [ "$silent" != "true" ] && echo "Loaded environment variables from $loaded_count files"
+
     return 0
 }
 
-# Initialize the environment loader
+# Fast initialization
 init_env_loader() {
-    # Ensure required directories exist
-    ensure_env_directories
-    
+    local silent="${1:-false}"
+
+    # Fast directory creation
+    [ ! -d "$HOME/.cfgs" ] && mkdir -p "$HOME/.cfgs" 2>/dev/null
+
     # Load environment variables
-    load_env_variables
+    load_env_variables "$silent"
 }
 
 # Auto-initialize if this script is sourced
@@ -231,7 +307,7 @@ is_sourced() {
         [ "${(%):-%x}" != "${(%):-%N}" ]
     else
         case "$0" in
-            *loader.sh) return 1 ;;
+            *loader*.sh) return 1 ;;
             *) return 0 ;;
         esac
     fi
@@ -239,5 +315,5 @@ is_sourced() {
 
 if is_sourced && [ -z "${ENV_LOADER_INITIALIZED:-}" ]; then
     export ENV_LOADER_INITIALIZED=true
-    init_env_loader
+    init_env_loader true  # Silent mode for auto-initialization
 fi
