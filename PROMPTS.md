@@ -11,7 +11,7 @@
 LINUX: var_NU > var_WSL > var_LINUX > var_UNIX > var
 MACOS: var_NU > var_MACOS > var_UNIX > var
 WIN: var_NU > var_WIN > var
-当检测到是LINUX平台， 那么就应该过滤掉_WIN和_MACOS等其他平台的变量才对啊， LINUX平台就应该只是加载和LINUX平台有关的变量_LINUX, _UNIX和没有后缀还有各种特定SHELL后缀
+当检测到是LINUX平台， 那么就应该过滤掉_WIN和_MACOS等其他平台的变量才对啊，如果当前的linux环境不是Windows下的WSL环境，那么_WSL也应该过滤掉，但如果是WSL环境那么就只保留_WSL，其余过滤掉， LINUX平台就应该只是加载和LINUX平台有关的变量_LINUX, _UNIX和没有后缀还有各种特定SHELL后缀
 
 例如： .env有变量如下：
 CONFIG_DIR=~/.config
