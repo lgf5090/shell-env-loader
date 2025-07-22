@@ -77,4 +77,13 @@ nu --no-config-file "tests/shells/test_nu_comprehensive.nu"
 ```
 
 
+# 性能测试
+
+```zsh
+cd ~/Downloads && echo "1. ZSH loader (fixed):" && time zsh -c 'unset test_env_loader ENV_LOADER_INITIALIZED; source ~/Desktop/code/augment/shell-env-loader/src/shells/zsh/loader.zsh; echo "Result: $test_env_loader"'
+```
+
+```bash
+cd ~/Downloads && echo "2. BASH loader (fixed):" && time bash -c 'unset test_env_loader ENV_LOADER_INITIALIZED; source ~/Desktop/code/augment/shell-env-loader/src/shells/bash/loader.sh; echo "Result: $test_env_loader"'
+```
 
