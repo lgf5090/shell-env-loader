@@ -189,7 +189,7 @@ load_env_file() {
                 ;;
             *_WSL)
                 case "$platform" in
-                    WSL|LINUX)
+                    WSL)
                         export_key="${key%_WSL}"
                         should_export=true
                         ;;
@@ -197,7 +197,7 @@ load_env_file() {
                 ;;
             *_LINUX)
                 case "$platform" in
-                    LINUX|WSL)
+                    LINUX)
                         export_key="${key%_LINUX}"
                         should_export=true
                         ;;
