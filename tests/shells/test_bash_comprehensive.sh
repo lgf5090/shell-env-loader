@@ -91,11 +91,13 @@ run_tests() {
     # Prevent auto-initialization
     export ENV_LOADER_INITIALIZED=true
 
-    # Source the loader manually to avoid path issues
+    # Source common files first to avoid path issues
     COMMON_DIR="$SCRIPT_DIR/../../src/common"
-    . "$COMMON_DIR/platform.sh"
-    . "$COMMON_DIR/hierarchy.sh"
-    . "$SCRIPT_DIR/../../src/shells/bash/loader.sh"
+    . "$COMMON_DIR/platform.sh" 2>/dev/null
+    . "$COMMON_DIR/hierarchy.sh" 2>/dev/null
+
+    # Source the loader
+    . "$SCRIPT_DIR/../../src/shells/bash/loader.sh" 2>/dev/null
 
     # Clear the flag to allow loading
     unset ENV_LOADER_INITIALIZED
