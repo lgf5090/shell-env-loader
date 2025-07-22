@@ -206,27 +206,40 @@ load_env_file() {
         best_values[$base_name]="$value"
     done
 
-    # Export all best variables using ZSH's efficient associative array iteration
+    # Two-phase export to handle variable dependencies correctly
     local export_key export_value
-    for base_name in "${(@k)best_values}"; do
-        export_value="${best_values[$base_name]}"
 
-        # Expand variables in value using enhanced expansion for ALL variables
+    # Phase 1: Export all regular variables first (excluding PATH_ADDITION)
+    for base_name in "${(@k)best_values}"; do
+        # Skip PATH_ADDITION variables in phase 1
+        case "$base_name" in
+            PATH_ADDITION|PATH_ADDITIONS) continue ;;
+        esac
+
+        export_value="${best_values[$base_name]}"
+        # Expand variables in value using enhanced expansion
         export_value=$(safe_expand_vars "$export_value")
 
-        # Handle PATH additions with ZSH pattern matching
+        export "$base_name"="$export_value"
+        [[ "$silent" != "true" ]] && print -r "  Set $base_name=$export_value"
+    done
+
+    # Phase 2: Process PATH_ADDITION variables after all regular variables are exported
+    for base_name in "${(@k)best_values}"; do
+        # Only process PATH_ADDITION variables in phase 2
         case "$base_name" in
-            PATH_ADDITION|PATH_ADDITIONS)
-                if [[ -n "$export_value" && ":$PATH:" != *":$export_value:"* ]]; then
-                    export PATH="$export_value:$PATH"
-                    [[ "$silent" != "true" ]] && print -r "  Added to PATH: $export_value"
-                fi
-                ;;
-            *)
-                export "$base_name"="$export_value"
-                [[ "$silent" != "true" ]] && print -r "  Set $base_name=$export_value"
-                ;;
+            PATH_ADDITION|PATH_ADDITIONS) ;;
+            *) continue ;;
         esac
+
+        export_value="${best_values[$base_name]}"
+        # Now all dependency variables should be available for expansion
+        export_value=$(safe_expand_vars "$export_value")
+
+        if [[ -n "$export_value" && ":$PATH:" != *":$export_value:"* ]]; then
+            export PATH="$export_value:$PATH"
+            [[ "$silent" != "true" ]] && print -r "  Added to PATH: $export_value"
+        fi
     done
 }
 
