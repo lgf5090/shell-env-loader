@@ -26,6 +26,93 @@ detect_platform_fast() {
     esac
 }
 
+# Safe variable expansion using ZSH features
+safe_expand_vars() {
+    local value="$1"
+    local max_depth=10
+    local depth=0
+
+    # First, check for command injection attempts and treat them as literal strings
+    [[ "$value" == *'$('* || "$value" == *'`'* ]] && { echo "$value"; return }
+
+    # First handle tilde expansion (doesn't require $ symbol)
+    if [[ "$value" == *'~'* ]]; then
+        value="${value//\~/$HOME}"
+    fi
+
+    # Iterative variable expansion for compatibility
+    while [[ "$value" == *'$'* ]] && ((depth < max_depth)); do
+        local found_var=false
+
+        # Expand common variables using ZSH parameter expansion
+        if [[ "$value" == *'$HOME'* ]]; then
+            value="${value//\$HOME/$HOME}"
+            found_var=true
+        fi
+        if [[ "$value" == *'$USER'* ]]; then
+            value="${value//\$USER/$USER}"
+            found_var=true
+        fi
+        if [[ "$value" == *'$PWD'* ]]; then
+            value="${value//\$PWD/$PWD}"
+            found_var=true
+        fi
+
+        # Expand other environment variables that are already set
+        local common_vars=(GOPATH GOROOT NODE_ENV PYTHONPATH JAVA_HOME MAVEN_HOME CARGO_HOME RUSTUP_HOME)
+        for var in "${common_vars[@]}"; do
+            if [[ "$value" == *"\$$var"* ]]; then
+                local var_value="${(P)var}"  # ZSH indirect parameter expansion
+                if [[ -n "$var_value" ]]; then
+                    value="${value//\$$var/$var_value}"
+                    found_var=true
+                fi
+            fi
+        done
+
+        # Expand any other variables that are already set (for PATH_ADDITION variables)
+        # Extract variable names from $VAR patterns using ZSH
+        local temp_value="$value"
+        while [[ "$temp_value" == *'$'* ]]; do
+            # Find the next $VAR pattern
+            local before="${temp_value%%\$*}"
+            local after="${temp_value#*\$}"
+            if [[ "$after" != "$temp_value" ]]; then
+                # Extract variable name (alphanumeric and underscore only)
+                local var_name=""
+                local i=1
+                while [[ $i -le ${#after} ]]; do
+                    local char="${after[$i]}"
+                    if [[ "$char" == [A-Za-z0-9_] ]]; then
+                        var_name="$var_name$char"
+                    else
+                        break
+                    fi
+                    ((i++))
+                done
+
+                if [[ -n "$var_name" ]]; then
+                    local var_value="${(P)var_name}"  # ZSH indirect parameter expansion
+                    if [[ -n "$var_value" ]]; then
+                        value="${value//\$$var_name/$var_value}"
+                        found_var=true
+                    fi
+                fi
+
+                # Move past this variable for next iteration
+                temp_value="${after#$var_name}"
+            else
+                break
+            fi
+        done
+
+        [[ "$found_var" == false ]] && break
+        ((depth++))
+    done
+
+    echo "$value"
+}
+
 # Ultra-fast ZSH environment file loading using native ZSH features
 # Usage: load_env_file <file_path> [silent]
 load_env_file() {
@@ -44,9 +131,11 @@ load_env_file() {
     local -A best_values best_scores
 
     # Platform-specific suffixes for fast matching
+    # Priority: ZSH > Platform-specific > Platform > Generic Unix > No suffix
+    # Note: We explicitly exclude other shell suffixes (_BASH, _FISH, etc.)
     local -a valid_suffixes
     case "$platform" in
-        LINUX) valid_suffixes=(_ZSH _WSL _LINUX _UNIX) ;;
+        LINUX) valid_suffixes=(_ZSH _LINUX _UNIX) ;;
         WSL)   valid_suffixes=(_ZSH _WSL _LINUX _UNIX) ;;
         MACOS) valid_suffixes=(_ZSH _MACOS _UNIX) ;;
         WIN)   valid_suffixes=(_ZSH _WIN) ;;
@@ -122,23 +211,20 @@ load_env_file() {
     for base_name in "${(@k)best_values}"; do
         export_value="${best_values[$base_name]}"
 
-        # Fast variable expansion using ZSH parameter expansion
-        [[ "$export_value" == *'$HOME'* ]] && export_value="${export_value//\$HOME/$HOME}"
-        [[ "$export_value" == *'$USER'* ]] && export_value="${export_value//\$USER/$USER}"
-        [[ "$export_value" == *'$PWD'* ]] && export_value="${export_value//\$PWD/$PWD}"
-        [[ "$export_value" == *'~'* ]] && export_value="${export_value//\~/$HOME}"
+        # Expand variables in value using enhanced expansion for ALL variables
+        export_value=$(safe_expand_vars "$export_value")
 
         # Handle PATH additions with ZSH pattern matching
         case "$base_name" in
             PATH_ADDITION|PATH_ADDITIONS)
                 if [[ -n "$export_value" && ":$PATH:" != *":$export_value:"* ]]; then
                     export PATH="$export_value:$PATH"
-                    [[ "${ENV_LOADER_DEBUG:-}" == "true" ]] && print -r "  Added to PATH: $export_value" >&2
+                    [[ "$silent" != "true" ]] && print -r "  Added to PATH: $export_value"
                 fi
                 ;;
             *)
                 export "$base_name"="$export_value"
-                [[ "${ENV_LOADER_DEBUG:-}" == "true" ]] && print -r "  Set $base_name=$export_value" >&2
+                [[ "$silent" != "true" ]] && print -r "  Set $base_name=$export_value"
                 ;;
         esac
     done
